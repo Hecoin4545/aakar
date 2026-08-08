@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F7F3E9;
+    color: #4A5A78;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', Georgia, serif;
+    color: #3A2A1C;
+  }
+}
+
+/* Custom Utilities for Heritage Craftsmen */
+.sepia-archival {
+  filter: sepia(0.65) contrast(1.1) brightness(0.92);
+  transition: filter 0.5s ease;
+}
+
+.sepia-archival:hover {
+  filter: sepia(0.2) contrast(1.05) brightness(0.98);
+}
+
+.glass-nav {
+  background: rgba(247, 243, 233, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid #E3DDCE;
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F7F3E9;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9A45C;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B4863A;
+}

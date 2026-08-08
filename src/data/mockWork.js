@@ -1,0 +1,80 @@
+export const DUMMY_WORK_PROJECTS = [
+  {
+    _id: "work_1",
+    title: "The Penthouse Living Pavilion",
+    roomType: "Living Room",
+    scope: "Bespoke Walnut Paneling, Modular Sectional & Sculptural Tables",
+    beforeImage: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    afterImage: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+    completedYear: 2025,
+    dimensions: "1,200 sq. ft. Residence",
+    materialsUsed: ["American Walnut", "Italian Calacatta Marble", "Brass Detailing"],
+    description: "Full interior transformation of a high-rise penthouse living space into a warm minimalist sanctuary featuring custom acoustic slatted walnut wall paneling.",
+    featured: true
+  },
+  {
+    _id: "work_2",
+    title: "Heritage Dining Sanctuary",
+    roomType: "Dining Room",
+    scope: "12-Seater Live Edge Teak Table & Credenza Suite",
+    beforeImage: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80",
+    afterImage: "https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=1200&q=80",
+    completedYear: 2024,
+    dimensions: "14-Foot Table Length",
+    materialsUsed: ["Century-Old Reclaimed Teak", "Hand-Forged Iron", "Organic Beeswax"],
+    description: "Commissioned live-edge dinner setting carved from a single fallen century-old teak trunk, paired with hand-upholstered leather dining armchairs.",
+    featured: true
+  },
+  {
+    _id: "work_3",
+    title: "Executive Director Suite",
+    roomType: "Home Office",
+    scope: "Custom Desk, Integrated Library & Hidden Bar Unit",
+    beforeImage: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80",
+    afterImage: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1200&q=80",
+    completedYear: 2024,
+    dimensions: "500 sq. ft. Private Office",
+    materialsUsed: ["Smoked Oak", "Saddle Leather", "Acoustic Felt"],
+    description: "Complete overhaul of a corporate executive office into an artisanal private retreat with automated concealed storage and leather desk inlay.",
+    featured: true
+  },
+  {
+    _id: "work_4",
+    title: "Master Suite & Private Dressing Chamber",
+    roomType: "Master Suite",
+    scope: "Low-Profile Oak Bed Frame & Custom Walk-In Wardrobes",
+    beforeImage: "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1200&q=80",
+    afterImage: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+    completedYear: 2025,
+    dimensions: "850 sq. ft. Suite",
+    materialsUsed: ["Solid White Oak", "Natural Linen Upholstery", "Warm Ambient Backlighting"],
+    description: "Serene master bedroom suite transformation featuring a floating low-profile platform bed with seamless nightstand extensions and solid oak slat partition.",
+    featured: true
+  },
+  {
+    _id: "work_5",
+    title: "Minimalist Teak Sunroom Lounge",
+    roomType: "Living Room",
+    scope: "Bouclé Armchairs, Reclaimed Teak Coffee Table & Planters",
+    beforeImage: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&w=1200&q=80",
+    afterImage: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80",
+    completedYear: 2024,
+    dimensions: "450 sq. ft. Sunroom",
+    materialsUsed: ["Reclaimed Teak", "Belgian Linen Bouclé", "Brass Hardware"],
+    description: "Light-filled lounge space tailored for morning tea and reading, anchored by steam-bent teak lounge seating and handcrafted stone accents.",
+    featured: false
+  },
+  {
+    _id: "work_6",
+    title: "Courtyard Veranda & Dining Pergola",
+    roomType: "Outdoor & Pavilion",
+    scope: "Weatherproofed Solid Teak Outdoor Dining & Bench Seating",
+    beforeImage: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    afterImage: "https://images.unsplash.com/photo-1615066390971-03e4e1c36ddf?auto=format&fit=crop&w=1200&q=80",
+    completedYear: 2026,
+    dimensions: "950 sq. ft. Courtyard",
+    materialsUsed: ["Marine-Grade Burma Teak", "Stainless Steel Joinery", "UV Oil Sealer"],
+    description: "Bespoke al fresco pavilion featuring heavy teak timber beams, custom slatted benches, and a 10-seater dining centerpiece built to withstand seasonal weather.",
+    featured: true
+  }
+];
