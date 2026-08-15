@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -10,6 +10,7 @@ import { productService } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import AnimatedCounter from '../components/AnimatedCounter';
+import Pagination from '../components/Pagination';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,6 +28,12 @@ const Products = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [maxPrice, setMaxPrice] = useState(300000);
   const [sortBy, setSortBy] = useState('newest');
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(6);
+  const [isLoadMoreMode, setIsLoadMoreMode] = useState(false);
+  const productGridRef = useRef(null);
 
   // Mobile filter drawer
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
@@ -131,6 +138,39 @@ const Products = () => {
     });
   }, [products, searchQuery, maxPrice]);
 
+  // Reset page when any filter or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, selectedMaterial, selectedStock, searchQuery, maxPrice, sortBy]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  const paginatedProducts = useMemo(() => {
+    if (isLoadMoreMode) {
+      return filteredProducts.slice(0, currentPage * itemsPerPage);
+    }
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredProducts.slice(start, start + itemsPerPage);
+  }, [filteredProducts, currentPage, itemsPerPage, isLoadMoreMode]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    if (productGridRef.current) {
+      productGridRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage((prev) => prev + 1);
+    }
+  };
+
+  const handleToggleLoadMore = (mode) => {
+    setIsLoadMoreMode(mode);
+    setCurrentPage(1);
+  };
+
   // Clear all filters
   const handleClearFilters = () => {
     setSelectedCategory('All');
@@ -139,6 +179,7 @@ const Products = () => {
     setSearchQuery('');
     setMaxPrice(300000);
     setSortBy('newest');
+    setCurrentPage(1);
 
     setSearchParams({});
   };
@@ -146,6 +187,7 @@ const Products = () => {
   // Category selection
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
+    setCurrentPage(1);
 
     if (category === 'All') {
       setSearchParams({});
@@ -214,15 +256,14 @@ const Products = () => {
             <span className="font-sans text-xs text-[#8A8478] hidden lg:inline">
               Showing{' '}
               <AnimatedCounter
-                value={filteredProducts.length}
-                duration={0.8}
+                value={paginatedProducts.length}
+                duration={0.5}
               />{' '}
-              of{' '}
+              on Page {currentPage} of {totalPages || 1} (Total:{' '}
               <AnimatedCounter
-                value={products.length}
-                duration={0.8}
-              />{' '}
-              products
+                value={filteredProducts.length}
+                duration={0.5}
+              />)
             </span>
 
             {/* Sorting */}
@@ -484,7 +525,7 @@ const Products = () => {
           </aside>
 
           {/* ================= PRODUCT GRID ================= */}
-          <main className="md:col-span-9">
+          <main ref={productGridRef} className="md:col-span-9 scroll-mt-28">
 
             {/* Loading */}
             {loading ? (
@@ -517,20 +558,37 @@ const Products = () => {
 
             ) : (
 
-              /* Products */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <>
+                {/* Products Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                {filteredProducts.map((product) => (
-                  <ProductCard
-                    key={product?._id}
-                    product={product}
-                    onQuickView={(productItem) =>
-                      setSelectedProduct(productItem)
-                    }
-                  />
-                ))}
+                  {paginatedProducts.map((product) => (
+                    <ProductCard
+                      key={product?._id}
+                      product={product}
+                      onQuickView={(productItem) =>
+                        setSelectedProduct(productItem)
+                      }
+                    />
+                  ))}
 
-              </div>
+                </div>
+
+                {/* Pagination Controls */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredProducts.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  isLoadMoreMode={isLoadMoreMode}
+                  onToggleLoadMore={handleToggleLoadMore}
+                  hasMore={currentPage < totalPages}
+                  onLoadMore={handleLoadMore}
+                  loading={loading}
+                  label="Products"
+                />
+              </>
 
             )}
 

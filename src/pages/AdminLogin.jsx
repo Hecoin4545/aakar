@@ -4,8 +4,8 @@ import { Lock, Mail, ShieldAlert, ArrowRight } from 'lucide-react';
 import { adminAuthService } from '../services/api';
 
 const AdminLogin = () => {
-  const [email, setEmail] = useState('admin@heritagecraftsmen.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -25,14 +25,7 @@ const AdminLogin = () => {
         setError(res.data?.message || 'Invalid credentials');
       }
     } catch (err) {
-      // Direct client fallback support
-      if (email === 'admin@heritagecraftsmen.com' && password === 'admin123') {
-        localStorage.setItem('hc_admin_token', 'mock_admin_token_2026');
-        localStorage.setItem('hc_admin_user', JSON.stringify({ name: 'Heritage Craftsmen Admin', role: 'admin' }));
-        navigate('/admin');
-      } else {
-        setError(err.response?.data?.message || 'Login failed. Verify credentials.');
-      }
+      setError(err.response?.data?.message || 'Login failed. Verify your admin credentials.');
     } finally {
       setLoading(false);
     }
@@ -51,7 +44,7 @@ const AdminLogin = () => {
             Atelier Workspace Access
           </h1>
           <p className="font-sans text-xs text-[#8A8478]">
-            Enter your admin credentials to manage inventory & custom commissions.
+            Enter your administrative credentials to manage inventory & bespoke commissions.
           </p>
         </div>
 
@@ -70,8 +63,9 @@ const AdminLogin = () => {
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8478]" />
               <input
-                type="text"
+                type="email"
                 required
+                placeholder="admin@domain.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-[#F7F3E9] border border-[#E3DDCE] rounded pl-10 pr-4 py-2.5 text-xs text-[#3A2A1C] focus:outline-none focus:border-[#B4863A]"
@@ -88,17 +82,12 @@ const AdminLogin = () => {
               <input
                 type="password"
                 required
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-[#F7F3E9] border border-[#E3DDCE] rounded pl-10 pr-4 py-2.5 text-xs text-[#3A2A1C] focus:outline-none focus:border-[#B4863A]"
               />
             </div>
-          </div>
-
-          <div className="bg-[#EFEAE0] p-3 rounded text-[11px] text-[#4A5A78] space-y-0.5">
-            <div className="font-semibold text-[#3A2A1C]">Default Admin Credentials:</div>
-            <div>Email: <span className="font-mono text-[#B4863A]">admin@heritagecraftsmen.com</span></div>
-            <div>Password: <span className="font-mono text-[#B4863A]">admin123</span></div>
           </div>
 
           <button

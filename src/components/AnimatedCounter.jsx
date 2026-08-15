@@ -27,7 +27,7 @@ const AnimatedCounter = ({
     targetNumber = value;
   } else if (typeof value === 'string') {
     const raw = value.trim();
-    
+
     // Check leading non-digit characters (e.g. "₹")
     const leadingMatch = raw.match(/^[^\d.]+/);
     if (propPrefix === undefined && leadingMatch) {

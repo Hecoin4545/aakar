@@ -112,7 +112,10 @@ const ProductCard = ({ product, onQuickView }) => {
                 />
               ))
             ) : (
-              <span className="text-[10px] text-[#8A8478] font-sans">Natural Solid Wood</span>
+              <span className="text-[10px] text-[#B4863A] font-sans font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#B4863A] inline-block" />
+                Handcrafted Timber
+              </span>
             )}
           </div>
 

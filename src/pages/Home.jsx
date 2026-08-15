@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, MessageCircle, Hammer, Sparkles, Shield, Compass, Award, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, MessageCircle, Hammer, Sparkles, Compass, Award, CheckCircle2 } from 'lucide-react';
 import { productService, workService, inquiryService } from '../services/api';
 import { createQuickInquiryWhatsAppUrl } from '../utils/whatsapp';
 import ProductCard from '../components/ProductCard';
 import ProductDetailModal from '../components/ProductDetailModal';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
 import AnimatedCounter from '../components/AnimatedCounter';
-import { DUMMY_WORK_PROJECTS } from '../data/mockWork';
-import { DUMMY_PRODUCTS } from '../data/mockProducts';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -38,25 +36,18 @@ const Home = () => {
           workService.getWorkProjects()
         ]);
 
-        if (prodRes.data?.products && prodRes.data.products.length > 0) {
-          setAllProducts(prodRes.data.products);
-          setFeaturedProducts(prodRes.data.products.slice(0, 8));
-        } else {
-          setAllProducts(DUMMY_PRODUCTS);
-          setFeaturedProducts(DUMMY_PRODUCTS.slice(0, 8));
-        }
+        const prods = prodRes.data?.products || [];
+        setAllProducts(prods);
+        setFeaturedProducts(prods.slice(0, 8));
 
         const loadedWork = workRes.data?.projects || [];
-        if (loadedWork.length > 0) {
-          setFeaturedWork(loadedWork.slice(0, 2));
-        } else {
-          setFeaturedWork(DUMMY_WORK_PROJECTS.slice(0, 2));
-        }
+        setFeaturedWork(loadedWork.slice(0, 2));
       } catch (err) {
         console.error('Failed to load home page data:', err);
-        setAllProducts(DUMMY_PRODUCTS);
-        setFeaturedProducts(DUMMY_PRODUCTS.slice(0, 8));
-        setFeaturedWork(DUMMY_WORK_PROJECTS.slice(0, 2));
+        // Show empty state — no dummy fallback
+        setAllProducts([]);
+        setFeaturedProducts([]);
+        setFeaturedWork([]);
       } finally {
         setLoading(false);
       }
@@ -372,6 +363,13 @@ const Home = () => {
             <div className="py-12 text-center font-sans text-sm text-[#8A8478]">
               Loading signature products...
             </div>
+          ) : featuredProducts.length === 0 ? (
+            <div className="py-16 text-center space-y-3">
+              <Award className="w-10 h-10 text-[#B4863A] mx-auto opacity-40" />
+              <p className="font-sans text-sm text-[#8A8478]">
+                The atelier catalog is being curated. Check back soon.
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredProducts.map((prod) => (
@@ -409,17 +407,26 @@ const Home = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {featuredWork.map((project) => (
-            <BeforeAfterSlider
-              key={project._id}
-              beforeImage={project.beforeImage}
-              afterImage={project.afterImage}
-              title={project.title}
-              scope={project.scope}
-            />
-          ))}
-        </div>
+        {featuredWork.length === 0 ? (
+          <div className="py-12 text-center space-y-3">
+            <Compass className="w-10 h-10 text-[#B4863A] mx-auto opacity-40" />
+            <p className="font-sans text-sm text-[#8A8478]">
+              Portfolio commissions are being prepared. Check back soon.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {featuredWork.map((project) => (
+              <BeforeAfterSlider
+                key={project._id}
+                beforeImage={project.beforeImage}
+                afterImage={project.afterImage}
+                title={project.title}
+                scope={project.scope}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="mt-8 text-center">
           <Link

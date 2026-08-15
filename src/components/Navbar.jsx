@@ -41,14 +41,19 @@ const Navbar = () => {
         <div className="flex items-center justify-between">
           
           {/* Logo / Wordmark */}
-          <Link to="/" className="group flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-[#3A2A1C] text-[#B4863A] flex items-center justify-center font-serif font-bold text-lg group-hover:scale-105 transition-transform">
+          <Link to="/" className="group flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded bg-[#3A2A1C] text-[#B4863A] flex items-center justify-center font-serif font-bold text-lg group-hover:scale-105 transition-transform shadow-sm">
               H
             </div>
             <div className="flex flex-col">
-              <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight leading-none text-[#3A2A1C]">
-                HERITAGE CRAFTSMEN
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight leading-none text-[#3A2A1C]">
+                  HERITAGE CRAFTSMEN
+                </span>
+                <span className="hidden lg:inline-block text-[9px] font-sans font-bold uppercase tracking-widest text-[#B4863A] bg-[#B4863A]/10 border border-[#B4863A]/20 px-2 py-0.5 rounded-full">
+                  ✦ Est. 2005
+                </span>
+              </div>
               <span className="font-sans text-[10px] tracking-[0.25em] text-[#B4863A] uppercase font-semibold mt-0.5">
                 Artisanal Furniture Atelier
               </span>

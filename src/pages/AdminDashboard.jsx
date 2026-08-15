@@ -2,13 +2,68 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package, Layers, MessageSquare, Clock, Plus,
-  Search, Edit3, Trash2, LogOut, CheckCircle, AlertTriangle, Eye, Upload, X
+  Search, Edit3, Trash2, LogOut, CheckCircle, AlertTriangle,
+  Eye, Upload, X, MapPin, Image as ImageIcon
 } from 'lucide-react';
-import { productService, workService, inquiryService, journeyService, uploadService } from '../services/api';
+import {
+  productService, workService, inquiryService,
+  journeyService, uploadService
+} from '../services/api';
 
+// ─── Reusable image-upload helper component ───────────────────────────────────
+function ImageUploadField({ label, url, onUrlChange, onUpload, required = false }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      const res = await uploadService.uploadImages(fd);
+      if (res.data?.url) {
+        onUpload(res.data.url, res.data.public_id || null);
+      }
+    } catch {
+      alert('Image upload failed. Check your Cloudinary credentials.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block font-semibold text-[#3A2A1C] mb-1 text-xs">{label}{required ? ' *' : ''}</label>
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          value={url || ''}
+          onChange={(e) => onUrlChange(e.target.value)}
+          className="flex-1 bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
+          placeholder="Paste URL or upload →"
+        />
+        <label className={`flex items-center gap-1 px-3 py-2 rounded cursor-pointer text-xs font-semibold text-white transition-colors ${uploading ? 'bg-[#8A8478]' : 'bg-[#3A2A1C] hover:bg-[#B4863A]'}`}>
+          {uploading ? (
+            <span className="animate-spin">⏳</span>
+          ) : (
+            <Upload className="w-3.5 h-3.5 text-[#C9A45C]" />
+          )}
+          <span>{uploading ? 'Uploading…' : 'Upload'}</span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+        </label>
+      </div>
+      {url && (
+        <img src={url} alt="preview" className="mt-2 h-20 w-full object-cover rounded border border-[#E3DDCE]" onError={(e) => { e.target.style.display = 'none'; }} />
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('products'); // 'products', 'work', 'inquiries', 'timeline'
+  const [activeTab, setActiveTab] = useState('products');
 
   // Data States
   const [products, setProducts] = useState([]);
@@ -16,46 +71,53 @@ const AdminDashboard = () => {
   const [inquiries, setInquiries] = useState([]);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Filter & Search
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
 
-  // Modal State for Product Create/Edit
+  // ── Product Modal ──────────────────────────────────────────────────────────
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({
-    title: '',
-    category: 'Dining Room',
-    material: 'Solid Teak',
-    basePrice: '',
-    dimensions: '220cm L x 100cm W x 76cm H',
-    finish: 'Hand-rubbed organic oil & beeswax',
-    stockStatus: 'In Stock',
-    badge: '',
-    description: '',
-    images: []
-  });
+  const blankProductForm = {
+    title: '', category: 'Dining Room', material: 'Solid Teak',
+    basePrice: '150000', dimensions: '220cm L x 100cm W x 76cm H',
+    finish: 'Hand-rubbed organic oil & beeswax', warranty: '10-Year Structural Warranty',
+    careInstructions: 'Dust clean with a dry microfiber cloth.',
+    stockStatus: 'In Stock', badge: '', description: '',
+    images: [], imagePublicIds: []     // ← parallel arrays: images[i] ↔ imagePublicIds[i]
+  };
+  const [productForm, setProductForm] = useState(blankProductForm);
   const [productFormError, setProductFormError] = useState('');
 
-  // Modal State for Work Create
+  // ── Work Modal ─────────────────────────────────────────────────────────────
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
-  const [workForm, setWorkForm] = useState({
-    title: '',
-    roomType: 'Living Room',
+  const blankWorkForm = {
+    title: '', roomType: 'Living Room',
     scope: 'Bespoke Furniture Transformation',
-    beforeImage: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
-    afterImage: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
-    completedYear: 2026,
-    description: ''
-  });
+    beforeImage: '', beforeImagePublicId: null,
+    afterImage: '', afterImagePublicId: null,
+    completedYear: new Date().getFullYear(),
+    materialsUsed: '', description: ''
+  };
+  const [workForm, setWorkForm] = useState(blankWorkForm);
+  const [workFormError, setWorkFormError] = useState('');
 
+  // ── Timeline Modal ─────────────────────────────────────────────────────────
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
+  const blankTimelineForm = {
+    year: new Date().getFullYear(),
+    title: '', description: '', location: 'Jodhpur Atelier',
+    imageUrl: '', imagePublicId: null, isArchival: false
+  };
+  const [timelineForm, setTimelineForm] = useState(blankTimelineForm);
+  const [timelineFormError, setTimelineFormError] = useState('');
+
+  // ── Auth guard ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('hc_admin_token');
-    if (!token) {
-      navigate('/admin/login');
-      return;
-    }
+    if (!token) { navigate('/admin/login'); return; }
     loadDashboardData();
   }, [navigate]);
 
@@ -68,11 +130,13 @@ const AdminDashboard = () => {
         inquiryService.getInquiries(),
         journeyService.getTimelineEvents()
       ]);
-
       if (pRes.data?.products) setProducts(pRes.data.products);
       if (wRes.data?.projects) setWorkProjects(wRes.data.projects);
       if (iRes.data?.inquiries) setInquiries(iRes.data.inquiries);
-      if (tRes.data?.events) setTimelineEvents(tRes.data.events);
+      if (tRes.data?.events) {
+        const sorted = [...(tRes.data.events)].sort((a, b) => a.year - b.year);
+        setTimelineEvents(sorted);
+      }
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -86,24 +150,11 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
-  // PRODUCT CRUD
+  // ── PRODUCT CRUD ────────────────────────────────────────────────────────────
   const handleOpenCreateProduct = () => {
     setEditingProduct(null);
     setProductFormError('');
-    setProductForm({
-      title: '',
-      category: 'Dining Room',
-      material: 'Solid Teak',
-      basePrice: '150000',
-      dimensions: '220cm L x 100cm W x 76cm H',
-      finish: 'Hand-rubbed organic oil & beeswax',
-      warranty: '10-Year Structural Warranty',
-      careInstructions: 'Dust clean with a dry microfiber cloth.',
-      stockStatus: 'In Stock',
-      badge: '',
-      description: '',
-      images: []
-    });
+    setProductForm(blankProductForm);
     setIsProductModalOpen(true);
   };
 
@@ -122,7 +173,8 @@ const AdminDashboard = () => {
       stockStatus: prod.stockStatus || 'In Stock',
       badge: prod.badge || '',
       description: prod.description || '',
-      images: prod.images && prod.images.length ? [...prod.images] : []
+      images: prod.images ? [...prod.images] : [],
+      imagePublicIds: prod.imagePublicIds ? [...prod.imagePublicIds] : []
     });
     setIsProductModalOpen(true);
   };
@@ -131,25 +183,21 @@ const AdminDashboard = () => {
     e.preventDefault();
     setProductFormError('');
 
-    // Sanitize the form data before sending
+    if (productForm.images.filter(Boolean).length === 0) {
+      setProductFormError('Please upload at least one product image before saving.');
+      return;
+    }
+
     const sanitized = {
       ...productForm,
       basePrice: Number(productForm.basePrice),
-      // badge: only send valid enum values
-      badge: ['NEW', 'BESTSELLER', 'CUSTOM ORDER'].includes(productForm.badge)
-        ? productForm.badge
-        : null,
-      // description: provide fallback if empty
-      description: productForm.description.trim() || `${productForm.title} — handcrafted ${productForm.material} piece from Heritage Craftsmen.`,
-      // images: filter out empty strings
+      badge: ['NEW', 'BESTSELLER', 'CUSTOM ORDER'].includes(productForm.badge) ? productForm.badge : null,
+      description: productForm.description.trim() || `${productForm.title} — handcrafted ${productForm.material} piece.`,
       images: productForm.images.filter(img => img && img.trim()),
+      imagePublicIds: productForm.imagePublicIds.filter(Boolean),
     };
 
-    // Ensure at least one image (fallback to a default)
-    if (sanitized.images.length === 0) {
-      sanitized.images = ['https://images.unsplash.com/photo-1615066390971-03e4e1c36ddf?auto=format&fit=crop&w=1200&q=80'];
-    }
-
+    setActionLoading(true);
     try {
       if (editingProduct) {
         await productService.updateProduct(editingProduct._id, sanitized);
@@ -161,425 +209,387 @@ const AdminDashboard = () => {
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Unknown error';
       setProductFormError('Failed to save product: ' + msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleDeleteProduct = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    if (!window.confirm('Delete this product? Its Cloudinary images will also be removed.')) return;
     try {
       await productService.deleteProduct(id);
       loadDashboardData();
-    } catch {
-      alert('Failed to delete product');
-    }
+    } catch { alert('Failed to delete product.'); }
   };
 
-  // WORK CRUD
+  // Product image upload: maintains parallel images[] and imagePublicIds[]
+  const handleProductImageUpload = async (e, idx) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      const res = await uploadService.uploadImages(fd);
+      if (res.data?.url) {
+        const newImages = [...productForm.images];
+        const newPublicIds = [...productForm.imagePublicIds];
+        newImages[idx] = res.data.url;
+        newPublicIds[idx] = res.data.public_id || null;
+        setProductForm({ ...productForm, images: newImages, imagePublicIds: newPublicIds });
+      }
+    } catch { alert('Image upload failed.'); }
+  };
+
+  // ── WORK CRUD ───────────────────────────────────────────────────────────────
   const handleSaveWorkProject = async (e) => {
     e.preventDefault();
+    setWorkFormError('');
+
+    if (!workForm.beforeImage || !workForm.afterImage) {
+      setWorkFormError('Please upload both Before and After images.');
+      return;
+    }
+
+    const payload = {
+      ...workForm,
+      completedYear: Number(workForm.completedYear),
+      materialsUsed: workForm.materialsUsed
+        ? workForm.materialsUsed.split(',').map(m => m.trim()).filter(Boolean)
+        : []
+    };
+
+    setActionLoading(true);
     try {
-      await workService.createWorkProject(workForm);
+      await workService.createWorkProject(payload);
       setIsWorkModalOpen(false);
+      setWorkForm(blankWorkForm);
       loadDashboardData();
-    } catch {
-      alert('Failed to save work project');
+    } catch (err) {
+      setWorkFormError(err.response?.data?.message || 'Failed to save work project.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleDeleteWorkProject = async (id) => {
-    if (!window.confirm('Delete this work project entry?')) return;
+    if (!window.confirm('Delete this work project? Cloudinary images will also be removed.')) return;
     try {
       await workService.deleteWorkProject(id);
       loadDashboardData();
-    } catch {
-      alert('Failed to delete project');
-    }
+    } catch { alert('Failed to delete project.'); }
   };
 
-  // Image Upload helper
-  const handleImageUpload = async (e, fieldSetter) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // ── TIMELINE CRUD ───────────────────────────────────────────────────────────
+  const handleSaveTimelineEvent = async (e) => {
+    e.preventDefault();
+    setTimelineFormError('');
 
-    const formData = new FormData();
-    formData.append('image', file);
+    if (!timelineForm.imageUrl) {
+      setTimelineFormError('Please upload an image for this milestone.');
+      return;
+    }
 
+    const payload = { ...timelineForm, year: Number(timelineForm.year) };
+
+    setActionLoading(true);
     try {
-      const res = await uploadService.uploadImage(formData);
-      if (res.data?.url) {
-        fieldSetter(res.data.url);
-      }
-    } catch {
-      alert('Image upload failed. Using provided default URL.');
+      await journeyService.createTimelineEvent(payload);
+      setIsTimelineModalOpen(false);
+      setTimelineForm(blankTimelineForm);
+      loadDashboardData();
+    } catch (err) {
+      setTimelineFormError(err.response?.data?.message || 'Failed to save timeline event.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  // Filtered Products List
+  const handleDeleteTimelineEvent = async (id) => {
+    if (!window.confirm('Delete this timeline event? Its Cloudinary image will also be removed.')) return;
+    try {
+      await journeyService.deleteTimelineEvent(id);
+      loadDashboardData();
+    } catch { alert('Failed to delete event.'); }
+  };
+
+  // ── Filters ─────────────────────────────────────────────────────────────────
   const filteredProducts = products.filter(p => {
     const matchCat = categoryFilter === 'All' || p.category === categoryFilter;
     const matchSearch = !searchTerm || p.title.toLowerCase().includes(searchTerm.toLowerCase());
     return matchCat && matchSearch;
   });
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#F7F3E9] flex">
 
-      {/* 1. LEFT SIDEBAR NAVIGATION (Cream bg + Dark Active Highlight Bar matching design.md) */}
+      {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
       <aside className="w-64 bg-[#EFEAE0] border-r border-[#E3DDCE] flex flex-col justify-between flex-shrink-0">
         <div>
-          {/* Logo Bar */}
           <div className="p-6 border-b border-[#E3DDCE]">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded bg-[#3A2A1C] text-[#C9A45C] font-serif font-bold text-sm flex items-center justify-center">
-                H
-              </div>
+              <div className="w-7 h-7 rounded bg-[#3A2A1C] text-[#C9A45C] font-serif font-bold text-sm flex items-center justify-center">H</div>
               <div>
-                <h2 className="font-serif font-bold text-base text-[#3A2A1C] leading-none">
-                  HERITAGE
-                </h2>
-                <span className="font-sans text-[9px] uppercase tracking-widest text-[#B4863A]">
-                  Admin Workspace
-                </span>
+                <h2 className="font-serif font-bold text-base text-[#3A2A1C] leading-none">HERITAGE</h2>
+                <span className="font-sans text-[9px] uppercase tracking-widest text-[#B4863A]">Admin Workspace</span>
               </div>
             </div>
           </div>
 
-          {/* Navigation Links */}
           <nav className="p-4 space-y-1.5 font-sans text-xs">
-            <button
-              onClick={() => setActiveTab('products')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'products'
+            {[
+              { id: 'products', label: 'Product Inventory', Icon: Package },
+              { id: 'work', label: 'Work Commissions', Icon: Layers },
+              { id: 'timeline', label: 'Journey Timeline', Icon: Clock },
+              { id: 'inquiries', label: 'Customer Inquiries', Icon: MessageSquare, badge: inquiries.length },
+            ].map(({ id, label, Icon, badge }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between gap-3 transition-all ${activeTab === id
                   ? 'bg-[#3A2A1C] text-[#C9A45C] font-semibold shadow-sm border-l-4 border-[#B4863A]'
                   : 'text-[#4A5A78] hover:bg-[#F7F3E9] hover:text-[#3A2A1C]'
                 }`}
-            >
-              <Package className="w-4 h-4" />
-              <span>Product Inventory</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('work')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'work'
-                  ? 'bg-[#3A2A1C] text-[#C9A45C] font-semibold shadow-sm border-l-4 border-[#B4863A]'
-                  : 'text-[#4A5A78] hover:bg-[#F7F3E9] hover:text-[#3A2A1C]'
-                }`}
-            >
-              <Layers className="w-4 h-4" />
-              <span>Work Commissions</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('inquiries')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-all ${activeTab === 'inquiries'
-                  ? 'bg-[#3A2A1C] text-[#C9A45C] font-semibold shadow-sm border-l-4 border-[#B4863A]'
-                  : 'text-[#4A5A78] hover:bg-[#F7F3E9] hover:text-[#3A2A1C]'
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <MessageSquare className="w-4 h-4" />
-                <span>Customer Inquiries</span>
-              </div>
-              {inquiries.length > 0 && (
-                <span className="bg-[#B4863A] text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                  {inquiries.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('timeline')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'timeline'
-                  ? 'bg-[#3A2A1C] text-[#C9A45C] font-semibold shadow-sm border-l-4 border-[#B4863A]'
-                  : 'text-[#4A5A78] hover:bg-[#F7F3E9] hover:text-[#3A2A1C]'
-                }`}
-            >
-              <Clock className="w-4 h-4" />
-              <span>Journey Timeline</span>
-            </button>
+              >
+                <span className="flex items-center gap-3"><Icon className="w-4 h-4" />{label}</span>
+                {badge > 0 && <span className="bg-[#B4863A] text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{badge}</span>}
+              </button>
+            ))}
           </nav>
         </div>
 
-        {/* User Footer & Logout */}
         <div className="p-4 border-t border-[#E3DDCE] space-y-3">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate('/')}
-              className="text-xs text-[#8A8478] hover:text-[#3A2A1C] font-sans flex items-center gap-1"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>View Public Site</span>
-            </button>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full bg-white border border-[#E3DDCE] hover:bg-[#3A2A1C] hover:text-white text-[#3A2A1C] font-sans text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+          <button onClick={() => navigate('/')} className="text-xs text-[#8A8478] hover:text-[#3A2A1C] font-sans flex items-center gap-1">
+            <Eye className="w-3.5 h-3.5" /><span>View Public Site</span>
+          </button>
+          <button onClick={handleLogout} className="w-full bg-white border border-[#E3DDCE] hover:bg-[#3A2A1C] hover:text-white text-[#3A2A1C] font-sans text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition-colors">
+            <LogOut className="w-3.5 h-3.5" /><span>Sign Out</span>
           </button>
         </div>
       </aside>
 
-      {/* 2. MAIN CONTENT AREA */}
+      {/* ── MAIN CONTENT ────────────────────────────────────────────────────── */}
       <main className="flex-1 p-8 overflow-y-auto">
-        {loading && (
+        {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-sm font-sans text-[#8A8478]">Loading dashboard data...</div>
+            <div className="text-sm font-sans text-[#8A8478]">Loading dashboard data…</div>
           </div>
-        )}
-        {!loading && (
+        ) : (
           <>
-            {/* STAT CARDS ROW matching design.md */}
+            {/* ── STAT CARDS ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-
-              <div className="bg-white border border-[#E3DDCE] rounded-lg p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#3A2A1C] text-[#C9A45C] flex items-center justify-center flex-shrink-0">
-                  <Package className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="font-serif text-2xl font-bold text-[#3A2A1C]">{products.length}</div>
-                  <div className="font-sans text-xs text-[#8A8478]">Total Products</div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-[#E3DDCE] rounded-lg p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#5B7A4F]/10 text-[#5B7A4F] flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="font-serif text-2xl font-bold text-[#3A2A1C]">
-                    {products.filter(p => p.stockStatus === 'In Stock').length}
+              {[
+                { label: 'Total Products', value: products.length, Icon: Package, color: 'bg-[#3A2A1C] text-[#C9A45C]' },
+                { label: 'Active Listings', value: products.filter(p => p.stockStatus === 'In Stock').length, Icon: CheckCircle, color: 'bg-[#5B7A4F]/10 text-[#5B7A4F]' },
+                { label: 'Low Stock / Drafts', value: products.filter(p => p.stockStatus !== 'In Stock').length, Icon: AlertTriangle, color: 'bg-[#C07A2E]/10 text-[#C07A2E]' },
+                { label: 'Total Inquiries', value: inquiries.length, Icon: MessageSquare, color: 'bg-[#B4863A]/10 text-[#B4863A]' },
+              ].map(({ label, value, Icon, color }) => (
+                <div key={label} className="bg-white border border-[#E3DDCE] rounded-lg p-5 shadow-sm flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className="w-6 h-6" />
                   </div>
-                  <div className="font-sans text-xs text-[#8A8478]">Active Listings</div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-[#E3DDCE] rounded-lg p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#C07A2E]/10 text-[#C07A2E] flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="font-serif text-2xl font-bold text-[#3A2A1C]">
-                    {products.filter(p => p.stockStatus === 'Low Stock' || p.stockStatus === 'Draft').length}
+                  <div>
+                    <div className="font-serif text-2xl font-bold text-[#3A2A1C]">{value}</div>
+                    <div className="font-sans text-xs text-[#8A8478]">{label}</div>
                   </div>
-                  <div className="font-sans text-xs text-[#8A8478]">Low Stock / Drafts</div>
                 </div>
-              </div>
-
-              <div className="bg-white border border-[#E3DDCE] rounded-lg p-5 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#B4863A]/10 text-[#B4863A] flex items-center justify-center flex-shrink-0">
-                  <MessageSquare className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="font-serif text-2xl font-bold text-[#3A2A1C]">{inquiries.length}</div>
-                  <div className="font-sans text-xs text-[#8A8478]">Total Inquiries</div>
-                </div>
-              </div>
-
+              ))}
             </div>
 
-            {/* TAB CONTENT 1: PRODUCT MANAGEMENT CRUD TABLE */}
+            {/* ══════════════════════════════════════════════════════════════
+                TAB 1: PRODUCTS
+            ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'products' && (
               <div className="bg-white border border-[#E3DDCE] rounded-lg p-6 shadow-sm space-y-6">
-
-                {/* Header & Primary CTA */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">
-                      Product Inventory Management
-                    </h2>
-                    <p className="font-sans text-xs text-[#8A8478]">
-                      Manage catalog prices, dimensions, color swatches, and stock statuses.
-                    </p>
+                    <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Product Inventory</h2>
+                    <p className="font-sans text-xs text-[#8A8478]">Manage catalog, images (stored in Cloudinary), prices, and stock.</p>
                   </div>
-
-                  <button
-                    onClick={handleOpenCreateProduct}
-                    className="bg-[#2C2015] hover:bg-[#3A2A1C] text-white font-sans text-xs font-bold uppercase tracking-wider px-5 py-3 rounded shadow transition-all flex items-center gap-2 self-start sm:self-auto"
-                  >
-                    <Plus className="w-4 h-4 text-[#C9A45C]" />
-                    <span>+ Add New Product</span>
+                  <button onClick={handleOpenCreateProduct} className="bg-[#2C2015] hover:bg-[#3A2A1C] text-white font-sans text-xs font-bold uppercase tracking-wider px-5 py-3 rounded shadow transition-all flex items-center gap-2 self-start sm:self-auto">
+                    <Plus className="w-4 h-4 text-[#C9A45C]" /><span>Add Product</span>
                   </button>
                 </div>
 
-                {/* Search & Category Filter Toolbar */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#F7F3E9] p-3 rounded-md border border-[#E3DDCE]">
                   <div className="relative w-full sm:w-72">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8478]" />
-                    <input
-                      type="text"
-                      placeholder="Filter products..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full bg-white border border-[#E3DDCE] rounded pl-9 pr-3 py-1.5 text-xs text-[#3A2A1C] focus:outline-none focus:border-[#B4863A]"
-                    />
+                    <input type="text" placeholder="Filter products…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#E3DDCE] rounded pl-9 pr-3 py-1.5 text-xs text-[#3A2A1C] focus:outline-none focus:border-[#B4863A]" />
                   </div>
-
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <label className="font-sans text-xs text-[#8A8478]">Category:</label>
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="bg-white border border-[#E3DDCE] rounded px-3 py-1.5 text-xs font-sans text-[#3A2A1C] focus:outline-none"
-                    >
-                      <option value="All">All Categories</option>
-                      <option value="Dining Room">Dining Room</option>
-                      <option value="Living Room">Living Room</option>
-                      <option value="Master Suite">Master Suite</option>
-                      <option value="Home Office">Home Office</option>
-                      <option value="Seating">Seating</option>
-                      <option value="Tables">Tables</option>
-                      <option value="Storage">Storage</option>
+                    <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="bg-white border border-[#E3DDCE] rounded px-3 py-1.5 text-xs font-sans text-[#3A2A1C] focus:outline-none">
+                      {['All', 'Dining Room', 'Living Room', 'Master Suite', 'Home Office', 'Seating', 'Tables', 'Storage'].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 </div>
 
-                {/* PRODUCTS DATA TABLE */}
                 <div className="overflow-x-auto border border-[#E3DDCE] rounded-lg">
                   <table className="w-full text-left font-sans text-xs">
                     <thead className="bg-[#EFEAE0] border-b border-[#E3DDCE] uppercase text-[10px] font-bold tracking-widest text-[#B4863A]">
                       <tr>
-                        <th className="py-3.5 px-4">Item Details</th>
+                        <th className="py-3.5 px-4">Item</th>
                         <th className="py-3.5 px-4">Category</th>
                         <th className="py-3.5 px-4">Material</th>
-                        <th className="py-3.5 px-4">Base Price</th>
+                        <th className="py-3.5 px-4">Price</th>
                         <th className="py-3.5 px-4">Status</th>
                         <th className="py-3.5 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E3DDCE]">
                       {filteredProducts.length === 0 ? (
-                        <tr>
-                          <td colSpan="6" className="py-8 text-center text-[#8A8478]">
-                            No products match your criteria.
+                        <tr><td colSpan="6" className="py-8 text-center text-[#8A8478]">No products yet. Click Add Product to create one.</td></tr>
+                      ) : filteredProducts.map((prod) => (
+                        <tr key={prod._id} className="hover:bg-[#F7F3E9]/60 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              {prod.images?.[0]
+                                ? <img src={prod.images[0]} alt={prod.title} className="w-12 h-12 rounded object-cover border border-[#E3DDCE]" />
+                                : <div className="w-12 h-12 rounded bg-[#EFEAE0] border border-[#E3DDCE] flex items-center justify-center"><ImageIcon className="w-5 h-5 text-[#B4863A] opacity-40" /></div>
+                              }
+                              <div>
+                                <div className="font-serif font-bold text-sm text-[#3A2A1C]">{prod.title}</div>
+                                {prod.badge && <span className="text-[9px] bg-[#B4863A]/10 text-[#B4863A] px-1.5 py-0.5 rounded font-bold uppercase">{prod.badge}</span>}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-[#4A5A78] font-medium">{prod.category}</td>
+                          <td className="py-3.5 px-4 text-[#4A5A78]">{prod.material}</td>
+                          <td className="py-3.5 px-4 font-bold text-[#3A2A1C]">{prod.priceFormatted || `₹${Number(prod.basePrice).toLocaleString('en-IN')}`}</td>
+                          <td className="py-3.5 px-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${prod.stockStatus === 'In Stock' ? 'bg-[#5B7A4F]/15 text-[#5B7A4F]' : prod.stockStatus === 'Low Stock' ? 'bg-[#C07A2E]/15 text-[#C07A2E]' : 'bg-[#8A8478]/15 text-[#8A8478]'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${prod.stockStatus === 'In Stock' ? 'bg-[#5B7A4F]' : prod.stockStatus === 'Low Stock' ? 'bg-[#C07A2E]' : 'bg-[#8A8478]'}`} />
+                              {prod.stockStatus || 'In Stock'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => handleOpenEditProduct(prod)} className="p-1.5 rounded text-[#B4863A] hover:bg-[#EFEAE0] transition-colors" title="Edit"><Edit3 className="w-4 h-4" /></button>
+                              <button onClick={() => handleDeleteProduct(prod._id)} className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                           </td>
                         </tr>
-                      ) : (
-                        filteredProducts.map((prod) => (
-                          <tr key={prod._id} className="hover:bg-[#F7F3E9]/60 transition-colors">
-
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={prod.images && prod.images[0] ? prod.images[0] : 'https://images.unsplash.com/photo-1615066390971-03e4e1c36ddf?auto=format&fit=crop&w=1200&q=80'}
-                                  alt={prod.title}
-                                  className="w-12 h-12 rounded object-cover border border-[#E3DDCE]"
-                                />
-                                <div>
-                                  <div className="font-serif font-bold text-sm text-[#3A2A1C]">{prod.title}</div>
-                                  {prod.badge && (
-                                    <span className="text-[9px] bg-[#B4863A]/10 text-[#B4863A] px-1.5 py-0.5 rounded font-bold uppercase">
-                                      {prod.badge}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="py-3.5 px-4 text-[#4A5A78] font-medium">{prod.category}</td>
-                            <td className="py-3.5 px-4 text-[#4A5A78]">{prod.material}</td>
-                            <td className="py-3.5 px-4 font-bold text-[#3A2A1C]">
-                              {prod.priceFormatted || `₹${Number(prod.basePrice).toLocaleString('en-IN')}`}
-                            </td>
-
-                            {/* STATUS PILL (matching design.md green, amber, gray rules) */}
-                            <td className="py-3.5 px-4">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${prod.stockStatus === 'In Stock'
-                                  ? 'bg-[#5B7A4F]/15 text-[#5B7A4F]'
-                                  : prod.stockStatus === 'Low Stock'
-                                    ? 'bg-[#C07A2E]/15 text-[#C07A2E]'
-                                    : 'bg-[#8A8478]/15 text-[#8A8478]'
-                                }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${prod.stockStatus === 'In Stock' ? 'bg-[#5B7A4F]' : prod.stockStatus === 'Low Stock' ? 'bg-[#C07A2E]' : 'bg-[#8A8478]'
-                                  }`} />
-                                <span>{prod.stockStatus || 'In Stock'}</span>
-                              </span>
-                            </td>
-
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => handleOpenEditProduct(prod)}
-                                  className="p-1.5 rounded text-[#B4863A] hover:bg-[#EFEAE0] transition-colors"
-                                  title="Edit item"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteProduct(prod._id)}
-                                  className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors"
-                                  title="Delete item"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-
-                          </tr>
-                        ))
-                      )}
+                      ))}
                     </tbody>
                   </table>
                 </div>
-
               </div>
             )}
 
-            {/* TAB CONTENT 2: WORK COMMISSIONS */}
+            {/* ══════════════════════════════════════════════════════════════
+                TAB 2: WORK COMMISSIONS
+            ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'work' && (
               <div className="bg-white border border-[#E3DDCE] rounded-lg p-6 shadow-sm space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Work Commissions & Transformations</h2>
-                    <p className="font-sans text-xs text-[#8A8478]">Manage Before/After project portfolios.</p>
+                    <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Work Commissions</h2>
+                    <p className="font-sans text-xs text-[#8A8478]">Before/After project portfolios. Images stored in Cloudinary.</p>
                   </div>
-                  <button
-                    onClick={() => setIsWorkModalOpen(true)}
-                    className="bg-[#2C2015] text-white text-xs font-bold uppercase px-4 py-2.5 rounded flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4 text-[#C9A45C]" />
-                    <span>+ Add Project</span>
+                  <button onClick={() => { setWorkForm(blankWorkForm); setWorkFormError(''); setIsWorkModalOpen(true); }} className="bg-[#2C2015] text-white text-xs font-bold uppercase px-4 py-2.5 rounded flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-[#C9A45C]" /><span>Add Project</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {workProjects.map((w) => (
-                    <div key={w._id} className="border border-[#E3DDCE] rounded-lg p-4 bg-[#F7F3E9]/40 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-serif font-bold text-lg text-[#3A2A1C]">{w.title}</h3>
-                        <button
-                          onClick={() => handleDeleteWorkProject(w._id)}
-                          className="text-red-600 hover:text-red-800 text-xs font-semibold"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                        <div>
-                          <span className="text-[10px] font-bold text-[#8A8478] block">BEFORE</span>
-                          <img src={w.beforeImage} alt="Before" className="w-full h-24 object-cover rounded border" />
+                {workProjects.length === 0 ? (
+                  <div className="py-12 text-center space-y-2">
+                    <Layers className="w-10 h-10 text-[#B4863A] mx-auto opacity-40" />
+                    <p className="font-sans text-sm text-[#8A8478]">No work projects yet. Add your first commission above.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {workProjects.map((w) => (
+                      <div key={w._id} className="border border-[#E3DDCE] rounded-lg p-4 bg-[#F7F3E9]/40 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-serif font-bold text-lg text-[#3A2A1C]">{w.title}</h3>
+                          <button onClick={() => handleDeleteWorkProject(w._id)} className="text-red-600 hover:text-red-800 text-xs font-semibold flex items-center gap-1">
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
                         </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-[#5B7A4F] block">AFTER</span>
-                          <img src={w.afterImage} alt="After" className="w-full h-24 object-cover rounded border" />
+                        <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+                          <div>
+                            <span className="text-[10px] font-bold text-[#8A8478] block mb-1">BEFORE</span>
+                            <img src={w.beforeImage} alt="Before" className="w-full h-28 object-cover rounded border" onError={(e) => { e.target.style.display = 'none'; }} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-[#5B7A4F] block mb-1">AFTER</span>
+                            <img src={w.afterImage} alt="After" className="w-full h-28 object-cover rounded border" onError={(e) => { e.target.style.display = 'none'; }} />
+                          </div>
                         </div>
+                        <div className="flex items-center gap-3 text-xs text-[#8A8478]">
+                          <span className="font-semibold text-[#B4863A]">{w.roomType}</span>
+                          <span>·</span>
+                          <span>{w.completedYear}</span>
+                        </div>
+                        <p className="text-xs text-[#4A5A78]">{w.scope}</p>
                       </div>
-                      <p className="text-xs text-[#4A5A78]">{w.scope}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* TAB CONTENT 3: INQUIRIES */}
+            {/* ══════════════════════════════════════════════════════════════
+                TAB 3: JOURNEY TIMELINE
+            ══════════════════════════════════════════════════════════════ */}
+            {activeTab === 'timeline' && (
+              <div className="bg-white border border-[#E3DDCE] rounded-lg p-6 shadow-sm space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Brand Journey Timeline</h2>
+                    <p className="font-sans text-xs text-[#8A8478]">Milestones shown on the public Journey page. Images stored in Cloudinary.</p>
+                  </div>
+                  <button onClick={() => { setTimelineForm(blankTimelineForm); setTimelineFormError(''); setIsTimelineModalOpen(true); }} className="bg-[#2C2015] text-white text-xs font-bold uppercase px-4 py-2.5 rounded flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-[#C9A45C]" /><span>Add Milestone</span>
+                  </button>
+                </div>
+
+                {timelineEvents.length === 0 ? (
+                  <div className="py-12 text-center space-y-2">
+                    <Clock className="w-10 h-10 text-[#B4863A] mx-auto opacity-40" />
+                    <p className="font-sans text-sm text-[#8A8478]">No timeline events yet. Add your first milestone above.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {timelineEvents.map((ev) => (
+                      <div key={ev._id} className="p-4 border border-[#E3DDCE] rounded-lg flex items-center gap-5">
+                        {ev.imageUrl && (
+                          <img src={ev.imageUrl} alt={ev.title} className="w-20 h-16 object-cover rounded border border-[#E3DDCE] flex-shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <span className="font-serif text-2xl font-bold text-[#B4863A]">{ev.year}</span>
+                            {ev.isArchival && <span className="text-[10px] bg-[#2C2015] text-[#C9A45C] px-2 py-0.5 rounded uppercase font-bold">Archival</span>}
+                          </div>
+                          <h4 className="font-serif font-bold text-[#3A2A1C]">{ev.title}</h4>
+                          <p className="text-xs text-[#4A5A78] truncate">{ev.description}</p>
+                          {ev.location && (
+                            <div className="flex items-center gap-1 mt-1 text-[10px] text-[#8A8478]">
+                              <MapPin className="w-3 h-3 text-[#B4863A]" />{ev.location}
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={() => handleDeleteTimelineEvent(ev._id)} className="text-red-600 hover:text-red-800 p-2 flex-shrink-0" title="Delete">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════
+                TAB 4: INQUIRIES
+            ══════════════════════════════════════════════════════════════ */}
             {activeTab === 'inquiries' && (
               <div className="bg-white border border-[#E3DDCE] rounded-lg p-6 shadow-sm space-y-6">
                 <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Customer Inquiries Log</h2>
-                <div className="space-y-3">
-                  {inquiries.length === 0 ? (
-                    <p className="text-xs text-[#8A8478]">No customer inquiries recorded yet.</p>
-                  ) : (
-                    inquiries.map((inq, idx) => (
+                {inquiries.length === 0 ? (
+                  <p className="text-xs text-[#8A8478] py-8 text-center">No customer inquiries recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {inquiries.map((inq, idx) => (
                       <div key={inq._id || idx} className="p-4 border border-[#E3DDCE] rounded bg-[#F7F3E9]/50 space-y-1">
                         <div className="flex justify-between items-center text-xs font-bold text-[#3A2A1C]">
                           <span>{inq.name} ({inq.phone})</span>
@@ -590,122 +600,58 @@ const AdminDashboard = () => {
                         </div>
                         {inq.message && <p className="text-xs text-[#8A8478]">{inq.message}</p>}
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT 4: TIMELINE */}
-            {activeTab === 'timeline' && (
-              <div className="bg-white border border-[#E3DDCE] rounded-lg p-6 shadow-sm space-y-6">
-                <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Brand Journey Timeline</h2>
-                <div className="space-y-4">
-                  {timelineEvents.map((ev) => (
-                    <div key={ev._id} className="p-4 border border-[#E3DDCE] rounded flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="font-serif text-2xl font-bold text-[#B4863A]">{ev.year}</span>
-                        <div>
-                          <h4 className="font-serif font-bold text-[#3A2A1C]">{ev.title}</h4>
-                          <p className="text-xs text-[#4A5A78]">{ev.description}</p>
-                        </div>
-                      </div>
-                      {ev.isArchival && <span className="text-[10px] bg-[#2C2015] text-[#C9A45C] px-2 py-0.5 rounded uppercase font-bold">Archival</span>}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </>
         )}
-
       </main>
 
-      {/* CREATE / EDIT PRODUCT MODAL */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODAL: CREATE / EDIT PRODUCT
+      ══════════════════════════════════════════════════════════════════════ */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#F7F3E9] w-full max-w-2xl rounded-xl border border-[#E3DDCE] shadow-2xl p-6 space-y-4 my-8">
-
             <div className="flex items-center justify-between border-b border-[#E3DDCE] pb-3">
-              <h3 className="font-serif text-xl font-bold text-[#3A2A1C]">
-                {editingProduct ? 'Edit Furniture Item' : 'Create New Product'}
-              </h3>
-              <button onClick={() => { setIsProductModalOpen(false); setProductFormError(''); }}>
-                <X className="w-5 h-5 text-[#3A2A1C]" />
-              </button>
+              <h3 className="font-serif text-xl font-bold text-[#3A2A1C]">{editingProduct ? 'Edit Furniture Item' : 'Create New Product'}</h3>
+              <button onClick={() => { setIsProductModalOpen(false); setProductFormError(''); }}><X className="w-5 h-5 text-[#3A2A1C]" /></button>
             </div>
 
             {productFormError && (
-              <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700 font-sans">
-                ⚠ {productFormError}
-              </div>
+              <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700">⚠ {productFormError}</div>
             )}
 
             <form onSubmit={handleSaveProduct} className="space-y-4 font-sans text-xs">
-
               <div>
                 <label className="block font-semibold text-[#3A2A1C] mb-1">Product Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={productForm.title}
-                  onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
-                  className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                />
+                <input required type="text" value={productForm.title} onChange={(e) => setProductForm({ ...productForm, title: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Category *</label>
-                  <select
-                    value={productForm.category}
-                    onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  >
-                    <option value="Dining Room">Dining Room</option>
-                    <option value="Living Room">Living Room</option>
-                    <option value="Master Suite">Master Suite</option>
-                    <option value="Home Office">Home Office</option>
-                    <option value="Seating">Seating</option>
-                    <option value="Tables">Tables</option>
-                    <option value="Storage">Storage</option>
+                  <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]">
+                    {['Dining Room', 'Living Room', 'Master Suite', 'Home Office', 'Seating', 'Tables', 'Storage'].map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Base Price (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.basePrice}
-                    onChange={(e) => setProductForm({ ...productForm, basePrice: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  />
+                  <input required type="number" value={productForm.basePrice} onChange={(e) => setProductForm({ ...productForm, basePrice: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Primary Material *</label>
-                  <input
-                    type="text"
-                    required
-                    value={productForm.material}
-                    onChange={(e) => setProductForm({ ...productForm, material: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  />
+                  <input required type="text" value={productForm.material} onChange={(e) => setProductForm({ ...productForm, material: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
                 </div>
-
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Stock Status</label>
-                  <select
-                    value={productForm.stockStatus}
-                    onChange={(e) => setProductForm({ ...productForm, stockStatus: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  >
-                    <option value="In Stock">In Stock</option>
-                    <option value="Low Stock">Low Stock</option>
-                    <option value="Draft">Draft</option>
+                  <select value={productForm.stockStatus} onChange={(e) => setProductForm({ ...productForm, stockStatus: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]">
+                    <option>In Stock</option><option>Low Stock</option><option>Draft</option>
                   </select>
                 </div>
               </div>
@@ -713,224 +659,216 @@ const AdminDashboard = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Dimensions</label>
-                  <input
-                    type="text"
-                    value={productForm.dimensions}
-                    onChange={(e) => setProductForm({ ...productForm, dimensions: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  />
+                  <input type="text" value={productForm.dimensions} onChange={(e) => setProductForm({ ...productForm, dimensions: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
                 </div>
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Finish Treatment</label>
-                  <input
-                    type="text"
-                    value={productForm.finish}
-                    onChange={(e) => setProductForm({ ...productForm, finish: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  />
+                  <input type="text" value={productForm.finish} onChange={(e) => setProductForm({ ...productForm, finish: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Warranty</label>
-                  <input
-                    type="text"
-                    value={productForm.warranty}
-                    onChange={(e) => setProductForm({ ...productForm, warranty: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  />
+                  <input type="text" value={productForm.warranty} onChange={(e) => setProductForm({ ...productForm, warranty: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
                 </div>
                 <div>
-                  <label className="block font-semibold text-[#3A2A1C] mb-1">Care Instructions</label>
-                  <input
-                    type="text"
-                    value={productForm.careInstructions}
-                    onChange={(e) => setProductForm({ ...productForm, careInstructions: e.target.value })}
-                    className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                  />
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Badge</label>
+                  <select value={productForm.badge} onChange={(e) => setProductForm({ ...productForm, badge: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]">
+                    <option value="">None</option><option value="NEW">NEW</option><option value="BESTSELLER">BESTSELLER</option><option value="CUSTOM ORDER">CUSTOM ORDER</option>
+                  </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-[#3A2A1C] mb-1">Badge / Label</label>
-                <select
-                  value={productForm.badge}
-                  onChange={(e) => setProductForm({ ...productForm, badge: e.target.value })}
-                  className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                >
-                  <option value="">None</option>
-                  <option value="NEW">NEW</option>
-                  <option value="BESTSELLER">BESTSELLER</option>
-                  <option value="CUSTOM ORDER">CUSTOM ORDER</option>
-                </select>
-              </div>
-
+              {/* Product Images with Cloudinary upload */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block font-semibold text-[#3A2A1C]">Product Images</label>
-                  <button
-                    type="button"
-                    onClick={() => setProductForm({ ...productForm, images: [...productForm.images, ''] })}
-                    className="text-xs text-[#B4863A] font-bold"
-                  >
-                    + Add Image
+                  <label className="block font-semibold text-[#3A2A1C]">Product Images (Cloudinary) *</label>
+                  <button type="button" onClick={() => setProductForm({ ...productForm, images: [...productForm.images, ''], imagePublicIds: [...productForm.imagePublicIds, null] })} className="text-xs text-[#B4863A] font-bold hover:text-[#3A2A1C]">
+                    + Add Slot
                   </button>
                 </div>
-
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  {productForm.images.length === 0 && (
+                    <p className="text-[10px] text-[#8A8478] italic">Click "+ Add Slot" then upload an image from Cloudinary.</p>
+                  )}
                   {productForm.images.map((imgUrl, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={imgUrl || ''}
-                        onChange={(e) => {
-                          const newImages = [...productForm.images];
-                          newImages[idx] = e.target.value;
-                          setProductForm({ ...productForm, images: newImages });
-                        }}
-                        className="flex-1 bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                        placeholder="https://..."
-                      />
-                      <label className="bg-[#3A2A1C] text-white px-3 py-2 rounded cursor-pointer text-xs font-semibold flex items-center gap-1">
-                        <Upload className="w-3.5 h-3.5 text-[#C9A45C]" />
+                    <div key={idx} className="space-y-1">
+                      <div className="flex gap-2 items-center">
                         <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handleImageUpload(e, (url) => {
-                            const newImages = [...productForm.images];
-                            newImages[idx] = url;
-                            setProductForm({ ...productForm, images: newImages });
-                          })}
+                          type="text"
+                          value={imgUrl || ''}
+                          onChange={(e) => {
+                            const n = [...productForm.images];
+                            n[idx] = e.target.value;
+                            setProductForm({ ...productForm, images: n });
+                          }}
+                          className="flex-1 bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
+                          placeholder="Paste URL or upload →"
                         />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newImages = [...productForm.images];
-                          newImages.splice(idx, 1);
-                          setProductForm({ ...productForm, images: newImages });
-                        }}
-                        className="p-2 text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                        <label className="bg-[#3A2A1C] hover:bg-[#B4863A] text-white px-3 py-2 rounded cursor-pointer text-xs font-semibold flex items-center gap-1 transition-colors">
+                          <Upload className="w-3.5 h-3.5 text-[#C9A45C]" />
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleProductImageUpload(e, idx)} />
+                        </label>
+                        <button type="button" onClick={() => {
+                          const ni = [...productForm.images]; ni.splice(idx, 1);
+                          const np = [...productForm.imagePublicIds]; np.splice(idx, 1);
+                          setProductForm({ ...productForm, images: ni, imagePublicIds: np });
+                        }} className="p-2 text-red-500 hover:text-red-700"><X className="w-4 h-4" /></button>
+                      </div>
+                      {imgUrl && (
+                        <img src={imgUrl} alt={`preview-${idx}`} className="h-16 rounded border border-[#E3DDCE] object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                      )}
                     </div>
                   ))}
-                  {productForm.images.length === 0 && (
-                    <p className="text-[10px] text-gray-500 italic">No images added. Click + Add Image URL</p>
-                  )}
                 </div>
               </div>
 
               <div>
                 <label className="block font-semibold text-[#3A2A1C] mb-1">Description</label>
-                <textarea
-                  rows={3}
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                  className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]"
-                />
+                <textarea rows={3} value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-[#E3DDCE]">
-                <button
-                  type="button"
-                  onClick={() => setIsProductModalOpen(false)}
-                  className="px-4 py-2 border border-[#E3DDCE] rounded text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-[#2C2015] text-white px-6 py-2 rounded text-xs font-bold uppercase tracking-wider"
-                >
-                  Save Product
+                <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-4 py-2 border border-[#E3DDCE] rounded text-xs font-semibold">Cancel</button>
+                <button type="submit" disabled={actionLoading} className="bg-[#2C2015] disabled:opacity-60 text-white px-6 py-2 rounded text-xs font-bold uppercase tracking-wider">
+                  {actionLoading ? 'Saving…' : 'Save Product'}
                 </button>
               </div>
-
             </form>
-
           </div>
         </div>
       )}
 
-      {/* CREATE WORK PROJECT MODAL */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODAL: CREATE WORK PROJECT
+      ══════════════════════════════════════════════════════════════════════ */}
       {isWorkModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#F7F3E9] w-full max-w-lg rounded-xl border border-[#E3DDCE] p-6 space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-serif text-lg font-bold">Add Work Commission</h3>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#F7F3E9] w-full max-w-lg rounded-xl border border-[#E3DDCE] p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b pb-2 border-[#E3DDCE]">
+              <h3 className="font-serif text-lg font-bold text-[#3A2A1C]">Add Work Commission</h3>
               <button onClick={() => setIsWorkModalOpen(false)}><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleSaveWorkProject} className="space-y-3 text-xs font-sans">
-              <input
-                placeholder="Project Title *"
-                required
-                value={workForm.title}
-                onChange={(e) => setWorkForm({ ...workForm, title: e.target.value })}
-                className="w-full p-2.5 border rounded"
-              />
-              <input
-                placeholder="Scope (e.g. 12-Seater Live Edge Table)"
-                required
-                value={workForm.scope}
-                onChange={(e) => setWorkForm({ ...workForm, scope: e.target.value })}
-                className="w-full p-2.5 border rounded"
-              />
+
+            {workFormError && <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700">⚠ {workFormError}</div>}
+
+            <form onSubmit={handleSaveWorkProject} className="space-y-4 text-xs font-sans">
               <div>
-                <label className="block font-semibold text-[#3A2A1C] mb-1">Before Image *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={workForm.beforeImage}
-                    onChange={(e) => setWorkForm({ ...workForm, beforeImage: e.target.value })}
-                    className="flex-1 p-2.5 border rounded text-xs"
-                    placeholder="https://..."
-                  />
-                  <label className="bg-[#3A2A1C] text-white px-3 py-2 rounded cursor-pointer text-xs font-semibold flex items-center gap-1">
-                    <Upload className="w-3.5 h-3.5 text-[#C9A45C]" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleImageUpload(e, (url) => setWorkForm({ ...workForm, beforeImage: url }))}
-                    />
-                  </label>
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Project Title *</label>
+                <input required value={workForm.title} onChange={(e) => setWorkForm({ ...workForm, title: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Room Type</label>
+                  <select value={workForm.roomType} onChange={(e) => setWorkForm({ ...workForm, roomType: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]">
+                    {['Living Room', 'Dining Room', 'Home Office', 'Master Suite', 'Outdoor & Pavilion'].map(r => <option key={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Completed Year</label>
+                  <input type="number" value={workForm.completedYear} onChange={(e) => setWorkForm({ ...workForm, completedYear: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
                 </div>
               </div>
+
               <div>
-                <label className="block font-semibold text-[#3A2A1C] mb-1">After Image *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={workForm.afterImage}
-                    onChange={(e) => setWorkForm({ ...workForm, afterImage: e.target.value })}
-                    className="flex-1 p-2.5 border rounded text-xs"
-                    placeholder="https://..."
-                  />
-                  <label className="bg-[#3A2A1C] text-white px-3 py-2 rounded cursor-pointer text-xs font-semibold flex items-center gap-1">
-                    <Upload className="w-3.5 h-3.5 text-[#C9A45C]" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleImageUpload(e, (url) => setWorkForm({ ...workForm, afterImage: url }))}
-                    />
-                  </label>
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Scope</label>
+                <input required value={workForm.scope} onChange={(e) => setWorkForm({ ...workForm, scope: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. 12-Seater Live Edge Teak Table" />
+              </div>
+
+              <ImageUploadField
+                label="Before Image"
+                required
+                url={workForm.beforeImage}
+                onUrlChange={(url) => setWorkForm({ ...workForm, beforeImage: url })}
+                onUpload={(url, pid) => setWorkForm({ ...workForm, beforeImage: url, beforeImagePublicId: pid })}
+              />
+
+              <ImageUploadField
+                label="After Image"
+                required
+                url={workForm.afterImage}
+                onUrlChange={(url) => setWorkForm({ ...workForm, afterImage: url })}
+                onUpload={(url, pid) => setWorkForm({ ...workForm, afterImage: url, afterImagePublicId: pid })}
+              />
+
+              <div>
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Materials Used (comma-separated)</label>
+                <input value={workForm.materialsUsed} onChange={(e) => setWorkForm({ ...workForm, materialsUsed: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="Teak, Walnut, Brass Hardware" />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Description</label>
+                <textarea rows={3} value={workForm.description} onChange={(e) => setWorkForm({ ...workForm, description: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+              </div>
+
+              <button type="submit" disabled={actionLoading} className="w-full bg-[#2C2015] disabled:opacity-60 text-white py-2.5 rounded font-bold uppercase text-xs tracking-wider">
+                {actionLoading ? 'Saving…' : 'Save Work Entry'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODAL: CREATE TIMELINE EVENT
+      ══════════════════════════════════════════════════════════════════════ */}
+      {isTimelineModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#F7F3E9] w-full max-w-lg rounded-xl border border-[#E3DDCE] p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b pb-2 border-[#E3DDCE]">
+              <h3 className="font-serif text-lg font-bold text-[#3A2A1C]">Add Timeline Milestone</h3>
+              <button onClick={() => setIsTimelineModalOpen(false)}><X className="w-5 h-5" /></button>
+            </div>
+
+            {timelineFormError && <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700">⚠ {timelineFormError}</div>}
+
+            <form onSubmit={handleSaveTimelineEvent} className="space-y-4 text-xs font-sans">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Year *</label>
+                  <input required type="number" min="1900" max="2100" value={timelineForm.year} onChange={(e) => setTimelineForm({ ...timelineForm, year: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Location</label>
+                  <input value={timelineForm.location} onChange={(e) => setTimelineForm({ ...timelineForm, location: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="Jodhpur Atelier" />
                 </div>
               </div>
-              <textarea
-                placeholder="Description..."
-                value={workForm.description}
-                onChange={(e) => setWorkForm({ ...workForm, description: e.target.value })}
-                className="w-full p-2.5 border rounded"
+
+              <div>
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Milestone Title *</label>
+                <input required value={timelineForm.title} onChange={(e) => setTimelineForm({ ...timelineForm, title: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Description *</label>
+                <textarea required rows={3} value={timelineForm.description} onChange={(e) => setTimelineForm({ ...timelineForm, description: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+              </div>
+
+              <ImageUploadField
+                label="Milestone Image"
+                required
+                url={timelineForm.imageUrl}
+                onUrlChange={(url) => setTimelineForm({ ...timelineForm, imageUrl: url })}
+                onUpload={(url, pid) => setTimelineForm({ ...timelineForm, imageUrl: url, imagePublicId: pid })}
               />
-              <button type="submit" className="w-full bg-[#2C2015] text-white py-2.5 rounded font-bold uppercase">
-                Save Work Entry
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isArchival"
+                  checked={timelineForm.isArchival}
+                  onChange={(e) => setTimelineForm({ ...timelineForm, isArchival: e.target.checked })}
+                  className="accent-[#B4863A] w-4 h-4"
+                />
+                <label htmlFor="isArchival" className="font-semibold text-[#3A2A1C] cursor-pointer">
+                  Mark as Historical Archival Photo
+                </label>
+              </div>
+
+              <button type="submit" disabled={actionLoading} className="w-full bg-[#2C2015] disabled:opacity-60 text-white py-2.5 rounded font-bold uppercase text-xs tracking-wider">
+                {actionLoading ? 'Saving…' : 'Save Milestone'}
               </button>
             </form>
           </div>
