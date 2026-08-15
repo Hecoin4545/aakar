@@ -93,13 +93,21 @@ const AdminDashboard = () => {
 
   // ── Work Modal ─────────────────────────────────────────────────────────────
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
+  const [editingWorkProject, setEditingWorkProject] = useState(null);
   const blankWorkForm = {
-    title: '', roomType: 'Living Room',
-    scope: 'Bespoke Furniture Transformation',
+    title: '',
+    clientLocation: 'The Minimalist Villa — Zurich',
+    sqft: '4,200 sq. ft.',
+    roomType: 'Living Room',
+    scope: 'Interior Architecture & Custom Paneling',
     beforeImage: '', beforeImagePublicId: null,
     afterImage: '', afterImagePublicId: null,
     completedYear: new Date().getFullYear(),
-    materialsUsed: '', description: ''
+    dimensions: '',
+    materialsUsed: 'Smoked Oak, Brushed Brass, Italian Travertine',
+    description: '',
+    gallery: [],
+    customFurnitureItems: []
   };
   const [workForm, setWorkForm] = useState(blankWorkForm);
   const [workFormError, setWorkFormError] = useState('');
@@ -241,6 +249,68 @@ const AdminDashboard = () => {
   };
 
   // ── WORK CRUD ───────────────────────────────────────────────────────────────
+  const handleOpenCreateWork = () => {
+    setEditingWorkProject(null);
+    setWorkFormError('');
+    setWorkForm(blankWorkForm);
+    setIsWorkModalOpen(true);
+  };
+
+  const handleOpenEditWork = (w) => {
+    setEditingWorkProject(w);
+    setWorkFormError('');
+    setWorkForm({
+      title: w.title || '',
+      clientLocation: w.clientLocation || 'Private Residence — Zurich',
+      sqft: w.sqft || '4,200 sq. ft.',
+      roomType: w.roomType || 'Living Room',
+      scope: w.scope || '',
+      beforeImage: w.beforeImage || '',
+      beforeImagePublicId: w.beforeImagePublicId || null,
+      afterImage: w.afterImage || '',
+      afterImagePublicId: w.afterImagePublicId || null,
+      completedYear: w.completedYear || new Date().getFullYear(),
+      dimensions: w.dimensions || '',
+      materialsUsed: Array.isArray(w.materialsUsed) ? w.materialsUsed.join(', ') : (w.materialsUsed || ''),
+      description: w.description || '',
+      gallery: Array.isArray(w.gallery) ? [...w.gallery] : [],
+      customFurnitureItems: Array.isArray(w.customFurnitureItems)
+        ? w.customFurnitureItems.map(item => ({ ...item }))
+        : []
+    });
+    setIsWorkModalOpen(true);
+  };
+
+  const handleWorkGalleryImageUpload = async (e, idx) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      const res = await uploadService.uploadImages(fd);
+      if (res.data?.url) {
+        const newGallery = [...workForm.gallery];
+        newGallery[idx] = res.data.url;
+        setWorkForm({ ...workForm, gallery: newGallery });
+      }
+    } catch { alert('Gallery image upload failed.'); }
+  };
+
+  const handleFurnitureItemImageUpload = async (e, idx) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    try {
+      const res = await uploadService.uploadImages(fd);
+      if (res.data?.url) {
+        const newItems = [...workForm.customFurnitureItems];
+        newItems[idx] = { ...newItems[idx], image: res.data.url };
+        setWorkForm({ ...workForm, customFurnitureItems: newItems });
+      }
+    } catch { alert('Furniture image upload failed.'); }
+  };
+
   const handleSaveWorkProject = async (e) => {
     e.preventDefault();
     setWorkFormError('');
@@ -253,14 +323,20 @@ const AdminDashboard = () => {
     const payload = {
       ...workForm,
       completedYear: Number(workForm.completedYear),
-      materialsUsed: workForm.materialsUsed
+      materialsUsed: typeof workForm.materialsUsed === 'string'
         ? workForm.materialsUsed.split(',').map(m => m.trim()).filter(Boolean)
-        : []
+        : workForm.materialsUsed,
+      gallery: (workForm.gallery || []).filter(g => g && g.trim()),
+      customFurnitureItems: (workForm.customFurnitureItems || []).filter(item => item && item.title && item.title.trim())
     };
 
     setActionLoading(true);
     try {
-      await workService.createWorkProject(payload);
+      if (editingWorkProject) {
+        await workService.updateWorkProject(editingWorkProject._id, payload);
+      } else {
+        await workService.createWorkProject(payload);
+      }
       setIsWorkModalOpen(false);
       setWorkForm(blankWorkForm);
       loadDashboardData();
@@ -484,9 +560,9 @@ const AdminDashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="font-serif text-2xl font-bold text-[#3A2A1C]">Work Commissions</h2>
-                    <p className="font-sans text-xs text-[#8A8478]">Before/After project portfolios. Images stored in Cloudinary.</p>
+                    <p className="font-sans text-xs text-[#8A8478]">Manage portfolio case studies, multi-photo galleries, and custom furniture pieces.</p>
                   </div>
-                  <button onClick={() => { setWorkForm(blankWorkForm); setWorkFormError(''); setIsWorkModalOpen(true); }} className="bg-[#2C2015] text-white text-xs font-bold uppercase px-4 py-2.5 rounded flex items-center gap-2">
+                  <button onClick={handleOpenCreateWork} className="bg-[#2C2015] hover:bg-[#3A2A1C] text-white text-xs font-bold uppercase px-4 py-2.5 rounded flex items-center gap-2 transition-all">
                     <Plus className="w-4 h-4 text-[#C9A45C]" /><span>Add Project</span>
                   </button>
                 </div>
@@ -499,29 +575,55 @@ const AdminDashboard = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {workProjects.map((w) => (
-                      <div key={w._id} className="border border-[#E3DDCE] rounded-lg p-4 bg-[#F7F3E9]/40 space-y-3">
+                      <div key={w._id} className="border border-[#E3DDCE] rounded-lg p-4 bg-[#F7F3E9]/40 space-y-3 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-serif font-bold text-lg text-[#3A2A1C]">{w.title}</h3>
-                          <button onClick={() => handleDeleteWorkProject(w._id)} className="text-red-600 hover:text-red-800 text-xs font-semibold flex items-center gap-1">
-                            <Trash2 className="w-3.5 h-3.5" /> Delete
-                          </button>
+                          <div>
+                            <h3 className="font-serif font-bold text-lg text-[#3A2A1C]">{w.title}</h3>
+                            {w.clientLocation && (
+                              <p className="text-xs text-[#B4863A] font-sans flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5" />
+                                {w.clientLocation}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleOpenEditWork(w)} className="p-1.5 rounded text-[#B4863A] hover:bg-[#EFEAE0] transition-colors" title="Edit">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeleteWorkProject(w._id)} className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
+
                         <div className="grid grid-cols-2 gap-2 text-xs font-sans">
                           <div>
                             <span className="text-[10px] font-bold text-[#8A8478] block mb-1">BEFORE</span>
-                            <img src={w.beforeImage} alt="Before" className="w-full h-28 object-cover rounded border" onError={(e) => { e.target.style.display = 'none'; }} />
+                            <img src={w.beforeImage} alt="Before" className="w-full h-28 object-cover rounded border border-[#E3DDCE]" onError={(e) => { e.target.style.display = 'none'; }} />
                           </div>
                           <div>
                             <span className="text-[10px] font-bold text-[#5B7A4F] block mb-1">AFTER</span>
-                            <img src={w.afterImage} alt="After" className="w-full h-28 object-cover rounded border" onError={(e) => { e.target.style.display = 'none'; }} />
+                            <img src={w.afterImage} alt="After" className="w-full h-28 object-cover rounded border border-[#E3DDCE]" onError={(e) => { e.target.style.display = 'none'; }} />
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-[#8A8478]">
-                          <span className="font-semibold text-[#B4863A]">{w.roomType}</span>
-                          <span>·</span>
-                          <span>{w.completedYear}</span>
+
+                        <div className="flex flex-wrap items-center justify-between text-xs text-[#8A8478] pt-1 border-t border-[#E3DDCE]/60">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-[#B4863A]">{w.roomType}</span>
+                            <span>·</span>
+                            <span>{w.completedYear}</span>
+                            {w.sqft && <span>· {w.sqft}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-[#3A2A1C]">
+                            <span className="bg-white border border-[#E3DDCE] px-2 py-0.5 rounded">
+                              📷 {(w.gallery || []).length} Gallery Photos
+                            </span>
+                            <span className="bg-[#B4863A]/10 text-[#B4863A] px-2 py-0.5 rounded">
+                              🛋️ {(w.customFurnitureItems || []).length} Furniture Pieces
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-xs text-[#4A5A78]">{w.scope}</p>
+                        <p className="text-xs text-[#4A5A78] line-clamp-2">{w.description || w.scope}</p>
                       </div>
                     ))}
                   </div>
@@ -741,14 +843,16 @@ const AdminDashboard = () => {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          MODAL: CREATE WORK PROJECT
+          MODAL: CREATE / EDIT WORK PROJECT
       ══════════════════════════════════════════════════════════════════════ */}
       {isWorkModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#F7F3E9] w-full max-w-lg rounded-xl border border-[#E3DDCE] p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between border-b pb-2 border-[#E3DDCE]">
-              <h3 className="font-serif text-lg font-bold text-[#3A2A1C]">Add Work Commission</h3>
-              <button onClick={() => setIsWorkModalOpen(false)}><X className="w-5 h-5" /></button>
+          <div className="bg-[#F7F3E9] w-full max-w-2xl rounded-xl border border-[#E3DDCE] shadow-2xl p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3 border-[#E3DDCE]">
+              <h3 className="font-serif text-xl font-bold text-[#3A2A1C]">
+                {editingWorkProject ? 'Edit Work Commission' : 'Add Work Commission'}
+              </h3>
+              <button onClick={() => setIsWorkModalOpen(false)}><X className="w-5 h-5 text-[#3A2A1C]" /></button>
             </div>
 
             {workFormError && <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700">⚠ {workFormError}</div>}
@@ -756,56 +860,229 @@ const AdminDashboard = () => {
             <form onSubmit={handleSaveWorkProject} className="space-y-4 text-xs font-sans">
               <div>
                 <label className="block font-semibold text-[#3A2A1C] mb-1">Project Title *</label>
-                <input required value={workForm.title} onChange={(e) => setWorkForm({ ...workForm, title: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+                <input required value={workForm.title} onChange={(e) => setWorkForm({ ...workForm, title: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. The Penthouse Living Pavilion" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-semibold text-[#3A2A1C] mb-1">Room Type</label>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Client / Location Tag</label>
+                  <input value={workForm.clientLocation} onChange={(e) => setWorkForm({ ...workForm, clientLocation: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. The Minimalist Villa — Zurich" />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Square Footage / Scale</label>
+                  <input value={workForm.sqft} onChange={(e) => setWorkForm({ ...workForm, sqft: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. 4,200 sq. ft." />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Room Type *</label>
                   <select value={workForm.roomType} onChange={(e) => setWorkForm({ ...workForm, roomType: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]">
                     {['Living Room', 'Dining Room', 'Home Office', 'Master Suite', 'Outdoor & Pavilion'].map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-[#3A2A1C] mb-1">Completed Year</label>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Completed Year *</label>
                   <input type="number" value={workForm.completedYear} onChange={(e) => setWorkForm({ ...workForm, completedYear: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[#3A2A1C] mb-1">Dimensions / Scale</label>
+                  <input value={workForm.dimensions} onChange={(e) => setWorkForm({ ...workForm, dimensions: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. 4,200 sq. ft. Residence" />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-[#3A2A1C] mb-1">Scope</label>
-                <input required value={workForm.scope} onChange={(e) => setWorkForm({ ...workForm, scope: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. 12-Seater Live Edge Teak Table" />
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Scope of Work *</label>
+                <input required value={workForm.scope} onChange={(e) => setWorkForm({ ...workForm, scope: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. Interior Architecture & Custom Paneling" />
               </div>
 
-              <ImageUploadField
-                label="Before Image"
-                required
-                url={workForm.beforeImage}
-                onUrlChange={(url) => setWorkForm({ ...workForm, beforeImage: url })}
-                onUpload={(url, pid) => setWorkForm({ ...workForm, beforeImage: url, beforeImagePublicId: pid })}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <ImageUploadField
+                  label="Before Image *"
+                  required
+                  url={workForm.beforeImage}
+                  onUrlChange={(url) => setWorkForm({ ...workForm, beforeImage: url })}
+                  onUpload={(url, pid) => setWorkForm({ ...workForm, beforeImage: url, beforeImagePublicId: pid })}
+                />
+                <ImageUploadField
+                  label="After Image (Hero) *"
+                  required
+                  url={workForm.afterImage}
+                  onUrlChange={(url) => setWorkForm({ ...workForm, afterImage: url })}
+                  onUpload={(url, pid) => setWorkForm({ ...workForm, afterImage: url, afterImagePublicId: pid })}
+                />
+              </div>
 
-              <ImageUploadField
-                label="After Image"
-                required
-                url={workForm.afterImage}
-                onUrlChange={(url) => setWorkForm({ ...workForm, afterImage: url })}
-                onUpload={(url, pid) => setWorkForm({ ...workForm, afterImage: url, afterImagePublicId: pid })}
-              />
+              {/* MULTI-PHOTO GALLERY SECTION */}
+              <div className="p-3 bg-white border border-[#E3DDCE] rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block font-bold text-[#3A2A1C]">Visual Gallery Showcase Photos (Close-ups, Materials, Lighting)</label>
+                    <span className="text-[10px] text-[#8A8478]">Displayed in the interactive horizontal-scroll case study gallery.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWorkForm({ ...workForm, gallery: [...workForm.gallery, ''] })}
+                    className="text-xs text-[#B4863A] font-bold hover:text-[#3A2A1C]"
+                  >
+                    + Add Gallery Image Slot
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {workForm.gallery.length === 0 && (
+                    <p className="text-[10px] text-[#8A8478] italic">No extra gallery photos added yet. Click "+ Add Gallery Image Slot" to upload close-ups.</p>
+                  )}
+                  {workForm.gallery.map((gUrl, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <div className="flex-1">
+                        <ImageUploadField
+                          label={`Gallery Photo #${idx + 1}`}
+                          url={gUrl}
+                          onUrlChange={(url) => {
+                            const ng = [...workForm.gallery];
+                            ng[idx] = url;
+                            setWorkForm({ ...workForm, gallery: ng });
+                          }}
+                          onUpload={(url) => {
+                            const ng = [...workForm.gallery];
+                            ng[idx] = url;
+                            setWorkForm({ ...workForm, gallery: ng });
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ng = [...workForm.gallery];
+                          ng.splice(idx, 1);
+                          setWorkForm({ ...workForm, gallery: ng });
+                        }}
+                        className="p-2 text-red-500 hover:text-red-700 mt-5"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CUSTOM FURNITURE ITEMS SECTION */}
+              <div className="p-3 bg-white border border-[#E3DDCE] rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block font-bold text-[#3A2A1C]">Custom Furniture Crafted For This Space</label>
+                    <span className="text-[10px] text-[#8A8478]">Direct links to bespoke furniture items showcased in the case study modal.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWorkForm({
+                      ...workForm,
+                      customFurnitureItems: [
+                        ...workForm.customFurnitureItems,
+                        { title: '', category: 'Seating', material: '', image: '' }
+                      ]
+                    })}
+                    className="text-xs text-[#B4863A] font-bold hover:text-[#3A2A1C]"
+                  >
+                    + Add Furniture Item
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {workForm.customFurnitureItems.length === 0 && (
+                    <p className="text-[10px] text-[#8A8478] italic">No custom furniture items added yet. Click "+ Add Furniture Item" to attach bespoke pieces.</p>
+                  )}
+                  {workForm.customFurnitureItems.map((item, idx) => (
+                    <div key={idx} className="p-3 border border-[#E3DDCE] rounded bg-[#F7F3E9]/50 space-y-2 relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ni = [...workForm.customFurnitureItems];
+                          ni.splice(idx, 1);
+                          setWorkForm({ ...workForm, customFurnitureItems: ni });
+                        }}
+                        className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block font-semibold text-[#3A2A1C] text-[10px] mb-1">Item Title</label>
+                          <input
+                            type="text"
+                            value={item.title || ''}
+                            onChange={(e) => {
+                              const ni = [...workForm.customFurnitureItems];
+                              ni[idx] = { ...ni[idx], title: e.target.value };
+                              setWorkForm({ ...workForm, customFurnitureItems: ni });
+                            }}
+                            className="w-full p-2 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]"
+                            placeholder="e.g. Kobe Ergonomic Armchair"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-[#3A2A1C] text-[10px] mb-1">Category</label>
+                          <input
+                            type="text"
+                            value={item.category || ''}
+                            onChange={(e) => {
+                              const ni = [...workForm.customFurnitureItems];
+                              ni[idx] = { ...ni[idx], category: e.target.value };
+                              setWorkForm({ ...workForm, customFurnitureItems: ni });
+                            }}
+                            className="w-full p-2 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]"
+                            placeholder="e.g. Seating"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-[#3A2A1C] text-[10px] mb-1">Material</label>
+                          <input
+                            type="text"
+                            value={item.material || ''}
+                            onChange={(e) => {
+                              const ni = [...workForm.customFurnitureItems];
+                              ni[idx] = { ...ni[idx], material: e.target.value };
+                              setWorkForm({ ...workForm, customFurnitureItems: ni });
+                            }}
+                            className="w-full p-2 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]"
+                            placeholder="e.g. Walnut & Bouclé"
+                          />
+                        </div>
+                      </div>
+                      <ImageUploadField
+                        label="Furniture Item Photo"
+                        url={item.image || ''}
+                        onUrlChange={(url) => {
+                          const ni = [...workForm.customFurnitureItems];
+                          ni[idx] = { ...ni[idx], image: url };
+                          setWorkForm({ ...workForm, customFurnitureItems: ni });
+                        }}
+                        onUpload={(url) => {
+                          const ni = [...workForm.customFurnitureItems];
+                          ni[idx] = { ...ni[idx], image: url };
+                          setWorkForm({ ...workForm, customFurnitureItems: ni });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <div>
                 <label className="block font-semibold text-[#3A2A1C] mb-1">Materials Used (comma-separated)</label>
-                <input value={workForm.materialsUsed} onChange={(e) => setWorkForm({ ...workForm, materialsUsed: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="Teak, Walnut, Brass Hardware" />
+                <input value={workForm.materialsUsed} onChange={(e) => setWorkForm({ ...workForm, materialsUsed: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="Smoked Oak, Brushed Brass, Italian Travertine" />
               </div>
 
               <div>
-                <label className="block font-semibold text-[#3A2A1C] mb-1">Description</label>
-                <textarea rows={3} value={workForm.description} onChange={(e) => setWorkForm({ ...workForm, description: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
+                <label className="block font-semibold text-[#3A2A1C] mb-1">Architectural Narrative / Description</label>
+                <textarea rows={4} value={workForm.description} onChange={(e) => setWorkForm({ ...workForm, description: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="Detailing vision, handcrafted joinery techniques, and interior design story..." />
               </div>
 
-              <button type="submit" disabled={actionLoading} className="w-full bg-[#2C2015] disabled:opacity-60 text-white py-2.5 rounded font-bold uppercase text-xs tracking-wider">
-                {actionLoading ? 'Saving…' : 'Save Work Entry'}
-              </button>
+              <div className="flex justify-end gap-3 pt-3 border-t border-[#E3DDCE]">
+                <button type="button" onClick={() => setIsWorkModalOpen(false)} className="px-4 py-2 border border-[#E3DDCE] rounded text-xs font-semibold">Cancel</button>
+                <button type="submit" disabled={actionLoading} className="bg-[#2C2015] disabled:opacity-60 text-white px-6 py-2 rounded text-xs font-bold uppercase tracking-wider">
+                  {actionLoading ? 'Saving…' : (editingWorkProject ? 'Update Work Entry' : 'Save Work Entry')}
+                </button>
+              </div>
             </form>
           </div>
         </div>

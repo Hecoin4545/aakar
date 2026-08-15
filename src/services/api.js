@@ -24,9 +24,10 @@ export const productService = {
 };
 
 export const workService = {
-  getWorkProjects:    (params) => api.get('/work', { params }),
-  createWorkProject:  (data)   => api.post('/work', data),
-  deleteWorkProject:  (id)     => api.delete(`/work/${id}`),
+  getWorkProjects:   (params) => api.get('/work', { params }),
+  createWorkProject: (data)   => api.post('/work', data),
+  updateWorkProject: (id, data) => api.put(`/work/${id}`, data),
+  deleteWorkProject: (id)     => api.delete(`/work/${id}`),
 };
 
 export const journeyService = {

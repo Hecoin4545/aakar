@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import FloatingActions from './components/FloatingActions';
+import ScrollToTop from './components/ScrollToTop';
 
 import Home from './pages/Home';
 import Products from './pages/Products';
@@ -46,6 +47,7 @@ function AppLayout() {
 function App() {
   return (
     <Router>
+      <ScrollToTop />
       <div className="min-h-screen flex flex-col bg-[#F7F3E9] text-[#4A5A78]">
         <AppLayout />
       </div>
