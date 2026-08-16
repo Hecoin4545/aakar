@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Package, Layers, MessageSquare, Clock, Plus,
   Search, Edit3, Trash2, LogOut, CheckCircle, AlertTriangle,
-  Eye, Upload, X, MapPin, Image as ImageIcon
+  Eye, Upload, X, MapPin, Image as ImageIcon, Menu
 } from 'lucide-react';
 import {
   productService, workService, inquiryService,
@@ -64,6 +64,7 @@ function ImageUploadField({ label, url, onUrlChange, onUpload, required = false 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('products');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Data States
   const [products, setProducts] = useState([]);
@@ -397,12 +398,40 @@ const AdminDashboard = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F7F3E9] flex">
+    <div className="min-h-screen bg-[#F7F3E9] flex flex-col md:flex-row">
+
+      {/* Mobile Top Header Bar */}
+      <div className="md:hidden bg-[#EFEAE0] border-b border-[#E3DDCE] px-4 py-3 flex items-center justify-between sticky top-0 z-30 w-full">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded bg-[#3A2A1C] text-[#C9A45C] font-serif font-bold text-sm flex items-center justify-center">H</div>
+          <div>
+            <h2 className="font-serif font-bold text-sm text-[#3A2A1C] leading-none">HERITAGE</h2>
+            <span className="font-sans text-[8px] uppercase tracking-widest text-[#B4863A]">Admin Workspace</span>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-1.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C] hover:bg-[#F7F3E9] transition-colors"
+          aria-label="Toggle Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Backdrop overlay for Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
       {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
-      <aside className="w-64 bg-[#EFEAE0] border-r border-[#E3DDCE] flex flex-col justify-between flex-shrink-0">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#EFEAE0] border-r border-[#E3DDCE] flex flex-col justify-between flex-shrink-0 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
         <div>
-          <div className="p-6 border-b border-[#E3DDCE]">
+          <div className="p-6 border-b border-[#E3DDCE] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded bg-[#3A2A1C] text-[#C9A45C] font-serif font-bold text-sm flex items-center justify-center">H</div>
               <div>
@@ -410,6 +439,14 @@ const AdminDashboard = () => {
                 <span className="font-sans text-[9px] uppercase tracking-widest text-[#B4863A]">Admin Workspace</span>
               </div>
             </div>
+            {/* Close button for mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-1 md:hidden text-[#4A5A78] hover:text-[#3A2A1C]"
+              aria-label="Close Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           <nav className="p-4 space-y-1.5 font-sans text-xs">
@@ -421,7 +458,7 @@ const AdminDashboard = () => {
             ].map(({ id, label, Icon, badge }) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
                 className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between gap-3 transition-all ${activeTab === id
                   ? 'bg-[#3A2A1C] text-[#C9A45C] font-semibold shadow-sm border-l-4 border-[#B4863A]'
                   : 'text-[#4A5A78] hover:bg-[#F7F3E9] hover:text-[#3A2A1C]'
@@ -435,7 +472,7 @@ const AdminDashboard = () => {
         </div>
 
         <div className="p-4 border-t border-[#E3DDCE] space-y-3">
-          <button onClick={() => navigate('/')} className="text-xs text-[#8A8478] hover:text-[#3A2A1C] font-sans flex items-center gap-1">
+          <button onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }} className="text-xs text-[#8A8478] hover:text-[#3A2A1C] font-sans flex items-center gap-1">
             <Eye className="w-3.5 h-3.5" /><span>View Public Site</span>
           </button>
           <button onClick={handleLogout} className="w-full bg-white border border-[#E3DDCE] hover:bg-[#3A2A1C] hover:text-white text-[#3A2A1C] font-sans text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition-colors">
@@ -445,7 +482,7 @@ const AdminDashboard = () => {
       </aside>
 
       {/* ── MAIN CONTENT ────────────────────────────────────────────────────── */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-sm font-sans text-[#8A8478]">Loading dashboard data…</div>
@@ -487,12 +524,12 @@ const AdminDashboard = () => {
                   </button>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#F7F3E9] p-3 rounded-md border border-[#E3DDCE]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#F7F3E9] p-3 rounded-md border border-[#E3DDCE]">
                   <div className="relative w-full sm:w-72">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8478]" />
                     <input type="text" placeholder="Filter products…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#E3DDCE] rounded pl-9 pr-3 py-1.5 text-xs text-[#3A2A1C] focus:outline-none focus:border-[#B4863A]" />
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
                     <label className="font-sans text-xs text-[#8A8478]">Category:</label>
                     <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="bg-white border border-[#E3DDCE] rounded px-3 py-1.5 text-xs font-sans text-[#3A2A1C] focus:outline-none">
                       {['All', 'Dining Room', 'Living Room', 'Master Suite', 'Home Office', 'Seating', 'Tables', 'Storage'].map(c => <option key={c} value={c}>{c}</option>)}
@@ -654,9 +691,9 @@ const AdminDashboard = () => {
                 ) : (
                   <div className="space-y-4">
                     {timelineEvents.map((ev) => (
-                      <div key={ev._id} className="p-4 border border-[#E3DDCE] rounded-lg flex items-center gap-5">
+                      <div key={ev._id} className="p-4 border border-[#E3DDCE] rounded-lg flex flex-col sm:flex-row sm:items-center gap-4">
                         {ev.imageUrl && (
-                          <img src={ev.imageUrl} alt={ev.title} className="w-20 h-16 object-cover rounded border border-[#E3DDCE] flex-shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />
+                          <img src={ev.imageUrl} alt={ev.title} className="w-full sm:w-20 h-32 sm:h-16 object-cover rounded border border-[#E3DDCE] flex-shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3">
@@ -664,16 +701,18 @@ const AdminDashboard = () => {
                             {ev.isArchival && <span className="text-[10px] bg-[#2C2015] text-[#C9A45C] px-2 py-0.5 rounded uppercase font-bold">Archival</span>}
                           </div>
                           <h4 className="font-serif font-bold text-[#3A2A1C]">{ev.title}</h4>
-                          <p className="text-xs text-[#4A5A78] truncate">{ev.description}</p>
+                          <p className="text-xs text-[#4A5A78] break-words">{ev.description}</p>
                           {ev.location && (
                             <div className="flex items-center gap-1 mt-1 text-[10px] text-[#8A8478]">
                               <MapPin className="w-3 h-3 text-[#B4863A]" />{ev.location}
                             </div>
                           )}
                         </div>
-                        <button onClick={() => handleDeleteTimelineEvent(ev._id)} className="text-red-600 hover:text-red-800 p-2 flex-shrink-0" title="Delete">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex justify-end sm:justify-start w-full sm:w-auto">
+                          <button onClick={() => handleDeleteTimelineEvent(ev._id)} className="text-red-600 hover:text-red-800 p-2 flex-shrink-0" title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -693,7 +732,7 @@ const AdminDashboard = () => {
                   <div className="space-y-3">
                     {inquiries.map((inq, idx) => (
                       <div key={inq._id || idx} className="p-4 border border-[#E3DDCE] rounded bg-[#F7F3E9]/50 space-y-1">
-                        <div className="flex justify-between items-center text-xs font-bold text-[#3A2A1C]">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-xs font-bold text-[#3A2A1C]">
                           <span>{inq.name} ({inq.phone})</span>
                           <span className="text-[#B4863A]">{new Date(inq.createdAt || Date.now()).toLocaleDateString()}</span>
                         </div>
@@ -716,7 +755,7 @@ const AdminDashboard = () => {
       ══════════════════════════════════════════════════════════════════════ */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#F7F3E9] w-full max-w-2xl rounded-xl border border-[#E3DDCE] shadow-2xl p-6 space-y-4 my-8">
+          <div className="bg-[#F7F3E9] w-full max-w-2xl rounded-xl border border-[#E3DDCE] shadow-2xl p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#E3DDCE] pb-3">
               <h3 className="font-serif text-xl font-bold text-[#3A2A1C]">{editingProduct ? 'Edit Furniture Item' : 'Create New Product'}</h3>
               <button onClick={() => { setIsProductModalOpen(false); setProductFormError(''); }}><X className="w-5 h-5 text-[#3A2A1C]" /></button>
@@ -732,7 +771,7 @@ const AdminDashboard = () => {
                 <input required type="text" value={productForm.title} onChange={(e) => setProductForm({ ...productForm, title: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Category *</label>
                   <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]">
@@ -745,7 +784,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Primary Material *</label>
                   <input required type="text" value={productForm.material} onChange={(e) => setProductForm({ ...productForm, material: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
@@ -758,7 +797,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Dimensions</label>
                   <input type="text" value={productForm.dimensions} onChange={(e) => setProductForm({ ...productForm, dimensions: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
@@ -769,7 +808,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Warranty</label>
                   <input type="text" value={productForm.warranty} onChange={(e) => setProductForm({ ...productForm, warranty: e.target.value })} className="w-full bg-white border border-[#E3DDCE] rounded p-2.5 text-xs text-[#3A2A1C]" />
@@ -863,7 +902,7 @@ const AdminDashboard = () => {
                 <input required value={workForm.title} onChange={(e) => setWorkForm({ ...workForm, title: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. The Penthouse Living Pavilion" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Client / Location Tag</label>
                   <input value={workForm.clientLocation} onChange={(e) => setWorkForm({ ...workForm, clientLocation: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. The Minimalist Villa — Zurich" />
@@ -874,7 +913,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Room Type *</label>
                   <select value={workForm.roomType} onChange={(e) => setWorkForm({ ...workForm, roomType: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]">
@@ -896,7 +935,7 @@ const AdminDashboard = () => {
                 <input required value={workForm.scope} onChange={(e) => setWorkForm({ ...workForm, scope: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" placeholder="e.g. Interior Architecture & Custom Paneling" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ImageUploadField
                   label="Before Image *"
                   required
@@ -1004,7 +1043,7 @@ const AdminDashboard = () => {
                       >
                         <X className="w-4 h-4" />
                       </button>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
                           <label className="block font-semibold text-[#3A2A1C] text-[10px] mb-1">Item Title</label>
                           <input
@@ -1093,7 +1132,7 @@ const AdminDashboard = () => {
       ══════════════════════════════════════════════════════════════════════ */}
       {isTimelineModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#F7F3E9] w-full max-w-lg rounded-xl border border-[#E3DDCE] p-6 space-y-4 my-8">
+          <div className="bg-[#F7F3E9] w-full max-w-lg rounded-xl border border-[#E3DDCE] shadow-2xl p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-2 border-[#E3DDCE]">
               <h3 className="font-serif text-lg font-bold text-[#3A2A1C]">Add Timeline Milestone</h3>
               <button onClick={() => setIsTimelineModalOpen(false)}><X className="w-5 h-5" /></button>
@@ -1102,7 +1141,7 @@ const AdminDashboard = () => {
             {timelineFormError && <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700">⚠ {timelineFormError}</div>}
 
             <form onSubmit={handleSaveTimelineEvent} className="space-y-4 text-xs font-sans">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-[#3A2A1C] mb-1">Year *</label>
                   <input required type="number" min="1900" max="2100" value={timelineForm.year} onChange={(e) => setTimelineForm({ ...timelineForm, year: e.target.value })} className="w-full p-2.5 border border-[#E3DDCE] rounded bg-white text-[#3A2A1C]" />
