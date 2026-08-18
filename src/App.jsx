@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics } from "@vercel/analytics/next"
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -28,6 +29,7 @@ function AppLayout() {
 
   return (
     <>
+      <Analytics />
       <Navbar />
       <main className="flex-grow">
         <Routes>
