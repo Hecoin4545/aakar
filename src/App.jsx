@@ -29,7 +29,6 @@ function AppLayout() {
 
   return (
     <>
-      <Analytics />
       <Navbar />
       <main className="flex-grow">
         <Routes>
@@ -42,6 +41,8 @@ function AppLayout() {
       </main>
       <Footer />
       <FloatingActions />
+      <Analytics />
+
     </>
   );
 }
@@ -53,6 +54,8 @@ function App() {
       <div className="min-h-screen flex flex-col bg-[#F7F3E9] text-[#4A5A78]">
         <AppLayout />
       </div>
+      <Analytics />
+
     </Router>
   );
 }
